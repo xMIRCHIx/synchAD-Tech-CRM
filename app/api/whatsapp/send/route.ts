@@ -26,28 +26,58 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
-    // Determine template language & dynamic parameters
+    // Determine template language & dynamic parameters for all 4 approved Meta pitch templates
     let effectiveLang = languageCode
     let templateComponents: any[] | undefined = undefined
 
-    if (templateName === 'no_website_pitch' || templateName === 'broken_website_pitch') {
+    const isPitchTemplate = [
+      'no_website_pitch',
+      'broken_website_pitch',
+      'website_upgrade_pitch',
+      'social_to_web_pitch'
+    ].includes(templateName)
+
+    if (isPitchTemplate) {
       effectiveLang = 'en'
       let params = templateParams
       if (!params || !params.length) {
         if (leadId) {
           const supabase = createAdminClient()
-          const { data: lead } = await supabase.from('leads').select('*').eq('id', leadId).single()
+          const { data: lead } = await supabase
+            .from('leads')
+            .select('*, website_audits(*)')
+            .eq('id', leadId)
+            .single()
+
           if (lead) {
             const name = lead.owner_name || lead.business_name || 'there'
             const bName = lead.business_name || 'your business'
             const rating = lead.google_rating ? String(lead.google_rating) : '5.0'
             const city = lead.address ? lead.address.split(',')[0].trim() : 'your city'
-            params = [name, bName, rating, city]
+            const flaw =
+              lead.website_audits?.[0]?.findings?.flaws?.[0] ||
+              lead.website_audits?.findings?.flaws?.[0] ||
+              'missing a 1-tap WhatsApp booking portal'
+
+            if (templateName === 'website_upgrade_pitch') {
+              params = [name, bName, rating, flaw]
+            } else if (templateName === 'social_to_web_pitch') {
+              params = [name, rating, bName, city]
+            } else {
+              params = [name, bName, rating, city]
+            }
           }
         }
       }
+
       if (!params || params.length < 4) {
-        params = ['there', 'your business', '5.0', 'your city']
+        if (templateName === 'website_upgrade_pitch') {
+          params = ['there', 'your business', '5.0', 'missing mobile booking portal']
+        } else if (templateName === 'social_to_web_pitch') {
+          params = ['there', '5.0', 'your business', 'your city']
+        } else {
+          params = ['there', 'your business', '5.0', 'your city']
+        }
       }
 
       templateComponents = [

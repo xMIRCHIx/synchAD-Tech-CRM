@@ -129,7 +129,14 @@ export default function InboxPage() {
     if (selectedLead?.site_state === 'broken') {
       setSelectedTemplateId('broken_website_pitch')
     } else if (selectedLead?.site_state === 'none') {
-      setSelectedTemplateId('no_website_pitch')
+      const url = (selectedLead.website_url || '').toLowerCase()
+      if (url.includes('instagram') || url.includes('facebook') || url.includes('linktr.ee') || url.includes('wa.me')) {
+        setSelectedTemplateId('social_to_web_pitch')
+      } else {
+        setSelectedTemplateId('no_website_pitch')
+      }
+    } else if (selectedLead?.site_state === 'exists') {
+      setSelectedTemplateId('website_upgrade_pitch')
     }
   }, [selectedLeadId, leads, conversations])
 
@@ -193,12 +200,27 @@ export default function InboxPage() {
           pitchText: text,
           leadId: selectedLead.id,
           templateName: templateToUse,
-          templateParams: [
-            selectedLead.owner_name || selectedLead.business_name || 'there',
-            selectedLead.business_name || 'your business',
-            selectedLead.google_rating ? String(selectedLead.google_rating) : '5.0',
-            selectedLead.address ? selectedLead.address.split(',')[0].trim() : 'your city'
-          ],
+          templateParams:
+            templateToUse === 'website_upgrade_pitch'
+              ? [
+                  selectedLead.owner_name || selectedLead.business_name || 'there',
+                  selectedLead.business_name || 'your business',
+                  selectedLead.google_rating ? String(selectedLead.google_rating) : '5.0',
+                  selectedLead.website_audits?.findings?.flaws?.[0] || 'missing a 1-tap WhatsApp booking button'
+                ]
+              : templateToUse === 'social_to_web_pitch'
+              ? [
+                  selectedLead.owner_name || selectedLead.business_name || 'there',
+                  selectedLead.google_rating ? String(selectedLead.google_rating) : '5.0',
+                  selectedLead.business_name || 'your business',
+                  selectedLead.address ? selectedLead.address.split(',')[0].trim() : 'your city'
+                ]
+              : [
+                  selectedLead.owner_name || selectedLead.business_name || 'there',
+                  selectedLead.business_name || 'your business',
+                  selectedLead.google_rating ? String(selectedLead.google_rating) : '5.0',
+                  selectedLead.address ? selectedLead.address.split(',')[0].trim() : 'your city'
+                ],
           useTextOnly: Boolean(conversations[selectedLead.id]?.messages?.length)
         })
       })
@@ -446,23 +468,17 @@ export default function InboxPage() {
     }
   }
 
-  // Official Meta WhatsApp Message Templates
+  // Official Meta WhatsApp Message Templates (All 4 Approved & Live)
   const META_TEMPLATES = [
-    {
-      id: 'hello_world',
-      name: 'hello_world',
-      category: 'Utility',
-      status: 'active',
-      label: '🟢 hello_world (Approved Active)',
-      getText: () =>
-        `Welcome and congratulations! This message demonstrates your WhatsApp Business setup.`,
-    },
     {
       id: 'no_website_pitch',
       name: 'no_website_pitch',
       category: 'Marketing',
       status: 'active',
       label: '🟢 no_website_pitch (Approved Active)',
+      headline: '🌐 Official Website & Client Portal Audit',
+      footer: 'SynchAD Tech Services • Business Growth Systems',
+      buttons: ['View Work Samples', 'Connect on Call'],
       getText: (lead: any) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
@@ -477,6 +493,9 @@ export default function InboxPage() {
       category: 'Marketing',
       status: 'active',
       label: '🟢 broken_website_pitch (Approved Active)',
+      headline: '⚠️ Urgent: Website Link Error Detected',
+      footer: 'SynchAD Tech Services • Rapid Web Support',
+      buttons: ['Fix Broken Website', 'Schedule 5-Min Zoom'],
       getText: (lead: any) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
@@ -489,8 +508,11 @@ export default function InboxPage() {
       id: 'website_upgrade_pitch',
       name: 'website_upgrade_pitch',
       category: 'Marketing',
-      status: 'in_review',
-      label: '⏳ website_upgrade_pitch (In Review)',
+      status: 'active',
+      label: '🟢 website_upgrade_pitch (Approved Active)',
+      headline: '🚀 Mobile Conversion & Funnel Audit',
+      footer: 'SynchAD Tech Services • Business Systems & Portals',
+      buttons: ['Review Audit Findings', 'Connect with Dev Team'],
       getText: (lead: any) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
@@ -503,8 +525,11 @@ export default function InboxPage() {
       id: 'social_to_web_pitch',
       name: 'social_to_web_pitch',
       category: 'Marketing',
-      status: 'in_review',
-      label: '⏳ social_to_web_pitch (In Review)',
+      status: 'active',
+      label: '🟢 social_to_web_pitch (Approved Active)',
+      headline: '📲 Social-to-Website Conversion Architecture',
+      footer: 'SynchAD Tech Services • Automated Client Booking',
+      buttons: ['See Web Samples', 'Request Demo Portal'],
       getText: (lead: any) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
@@ -512,6 +537,18 @@ export default function InboxPage() {
         const city = lead?.address ? lead.address.split(',')[0].trim() : 'your city'
         return `Hi ${name}, loved seeing your strong ${rating}★ rating and social presence for ${bName}!\n\nI noticed you're currently using a social media link instead of a dedicated business website and client portal. For a trusted brand in ${city}, having an official platform with custom management software and automated booking would significantly increase client inquiries.\n\nAt SynchAD Tech, we build modern websites and workflow systems for businesses like yours.\n\nWould you be open to checking out our work samples, or connecting on a quick 5-minute call / Zoom chat?`
       },
+    },
+    {
+      id: 'hello_world',
+      name: 'hello_world',
+      category: 'Utility',
+      status: 'active',
+      label: '🟢 hello_world (Approved Active)',
+      headline: '👋 Verified WhatsApp Connection',
+      footer: 'SynchAD Tech Automated Verification',
+      buttons: ['Confirm Receipt'],
+      getText: () =>
+        `Welcome and congratulations! This message demonstrates your WhatsApp Business setup.`,
     },
   ]
 
@@ -1005,9 +1042,41 @@ export default function InboxPage() {
                       </div>
                     </div>
 
-                    {/* Pre-Drafted Hook Card */}
-                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#111b21] border border-slate-200 dark:border-stone-800 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
-                      {activePitchText}
+                    {/* Pre-Drafted Hook Card with Realistic WhatsApp Template Styling */}
+                    <div className="rounded-2xl bg-white dark:bg-[#111b21] border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+                      {/* Headline Header */}
+                      <div className="px-4 py-2.5 bg-gradient-to-r from-emerald-600/10 via-teal-600/10 to-transparent border-b border-emerald-500/15 flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-400 tracking-wide flex items-center gap-1.5">
+                          <Sparkles size={12} />
+                          {activeTemplate.headline}
+                        </span>
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-800 dark:text-emerald-300">
+                          Meta Approved
+                        </span>
+                      </div>
+
+                      {/* Body */}
+                      <div className="p-4 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
+                        {activePitchText}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="px-4 pb-2.5 text-[10px] text-slate-400 dark:text-slate-500 font-medium italic border-t border-slate-100 dark:border-stone-800/60 pt-2">
+                        {activeTemplate.footer}
+                      </div>
+
+                      {/* Interactive Buttons Preview */}
+                      <div className="px-3 py-2 bg-slate-50 dark:bg-[#202c33]/50 border-t border-slate-200 dark:border-stone-800 flex flex-wrap gap-2">
+                        {activeTemplate.buttons.map((btn: string, idx: number) => (
+                          <div
+                            key={idx}
+                            className="px-3 py-1 rounded-lg text-[10px] font-extrabold bg-white dark:bg-[#111b21] border border-slate-200 dark:border-stone-700 text-slate-700 dark:text-slate-200 shadow-2xs flex items-center gap-1.5"
+                          >
+                            <MessageSquare size={10} className="text-[#00a884]" />
+                            <span>{btn}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Quick Send Action Buttons */}
@@ -1096,7 +1165,7 @@ export default function InboxPage() {
                         : 'bg-slate-100 dark:bg-[#111b21] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-stone-700/80'
                     }`}
                   >
-                    {tmpl.name === 'hello_world' ? '🟢 hello_world (Approved)' : `⏳ ${tmpl.name}`}
+                    🟢 {tmpl.name}
                   </button>
                 ))}
               </div>
