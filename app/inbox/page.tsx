@@ -6,7 +6,7 @@ import {
   MessageSquare, MessageCircle, Phone, Search, CheckCheck, Send,
   Sparkles, ExternalLink, Globe, MapPin, Check, Copy,
   PartyPopper, RefreshCw, PanelRight, X, AlertTriangle, ShieldCheck,
-  ChevronLeft, ArrowUpRight, Clock, Star, Flame, UserCheck, Trash2, Eraser
+  ChevronLeft, ArrowUpRight, Clock, Star, Flame, UserCheck, Trash2, Eraser, UserPlus
 } from 'lucide-react'
 import Toast, { ToastMessage } from '@/components/Toast'
 import type { Lead, LeadStatus, SiteState } from '@/lib/types'
@@ -25,11 +25,18 @@ export default function InboxPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterTab, setFilterTab] = useState<'all' | 'new' | 'sent' | 'replied' | 'won'>('all')
+  const [filterTab, setFilterTab] = useState<'all' | 'custom' | 'new' | 'sent' | 'replied' | 'won'>('all')
   const [showDossier, setShowDossier] = useState(false)
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const [tokenStatus, setTokenStatus] = useState<'live' | 'expired' | 'loading' | null>(null)
+
+  // Direct chat modal state
+  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false)
+  const [newChatPhone, setNewChatPhone] = useState('')
+  const [newChatName, setNewChatName] = useState('')
+  const [newChatMessage, setNewChatMessage] = useState('')
+  const [isCreatingChat, setIsCreatingChat] = useState(false)
 
   // Active chat messages & input
   const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([])
@@ -129,6 +136,17 @@ export default function InboxPage() {
       (l.campaigns?.niche && l.campaigns.niche.toLowerCase().includes(q))
 
     if (!matchesSearch) return false
+
+    if (filterTab === 'custom') {
+      const isDirect = !l.campaign_id
+      const isCustomNote = l.notes && (
+        l.notes.toLowerCase().includes('custom') ||
+        l.notes.toLowerCase().includes('direct') ||
+        l.notes.toLowerCase().includes('manual') ||
+        l.notes.toLowerCase().includes('inbound')
+      )
+      return isDirect || Boolean(isCustomNote)
+    }
 
     if (filterTab === 'new') return l.status === 'new' || l.status === 'review' || l.status === 'queued'
     if (filterTab === 'sent') return l.status === 'sent' || l.status === 'delivered' || l.status === 'read'
@@ -314,6 +332,108 @@ export default function InboxPage() {
     }
   }
 
+  // Start chat with any custom / direct phone number
+  async function handleStartNewChat(e: React.FormEvent) {
+    e.preventDefault()
+    let rawPhone = newChatPhone.trim().replace(/[^\d+]/g, '')
+    if (!rawPhone) return
+
+    // If Indian 10-digit number without +, normalize to +91
+    if (/^\d{10}$/.test(rawPhone)) {
+      rawPhone = `+91${rawPhone}`
+    } else if (/^91\d{10}$/.test(rawPhone)) {
+      rawPhone = `+${rawPhone}`
+    } else if (!rawPhone.startsWith('+')) {
+      rawPhone = `+${rawPhone}`
+    }
+
+    setIsCreatingChat(true)
+    try {
+      // 1. Check if lead already exists in current list
+      const cleanDigits = rawPhone.replace(/[^\d]/g, '')
+      const existing = leads.find((l) => {
+        const pDigits = l.phone.replace(/[^\d]/g, '')
+        return pDigits === cleanDigits || pDigits.slice(-10) === cleanDigits.slice(-10)
+      })
+
+      let targetLead: Lead
+
+      if (existing) {
+        targetLead = existing
+        setSelectedLeadId(existing.id)
+      } else {
+        // Create new direct lead in Supabase via /api/leads
+        const res = await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_name: newChatName.trim() || `Direct Contact (${rawPhone})`,
+            phone: rawPhone,
+            status: 'new',
+            site_state: 'unknown',
+            notes: 'Custom direct WhatsApp contact',
+            is_custom: true
+          })
+        })
+        const data = await res.json()
+        if (data.leads && data.leads.length > 0) {
+          targetLead = data.leads[0]
+          setLeads((prev) => [targetLead, ...prev])
+          setSelectedLeadId(targetLead.id)
+        } else {
+          throw new Error(data.error || 'Failed to create contact')
+        }
+      }
+
+      // 2. If initial message was provided, send it immediately via WhatsApp Cloud API
+      if (newChatMessage.trim()) {
+        const msgText = newChatMessage.trim()
+        await fetch('/api/whatsapp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: rawPhone,
+            pitchText: msgText,
+            leadId: targetLead.id,
+            useTextOnly: true,
+            templateName: 'hello_world'
+          })
+        })
+
+        const newMsg: ChatMessage = {
+          id: `temp-${Date.now()}`,
+          direction: 'outbound',
+          body: msgText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'delivered'
+        }
+        setActiveMessages((prev) => [...prev, newMsg])
+      }
+
+      setToast({
+        id: String(Date.now()),
+        title: 'Chat Opened',
+        description: `Connected to ${targetLead.business_name} (${rawPhone})`,
+        type: 'success'
+      })
+
+      setNewChatPhone('')
+      setNewChatName('')
+      setNewChatMessage('')
+      setIsNewChatModalOpen(false)
+      setMobileChatOpen(true)
+    } catch (err: any) {
+      setToast({
+        id: String(Date.now()),
+        title: 'Error',
+        description: err.message,
+        type: 'error'
+      })
+    } finally {
+      setIsCreatingChat(false)
+    }
+  }
+
   // Official Meta WhatsApp Message Templates
   const META_TEMPLATES = [
     {
@@ -486,14 +606,26 @@ export default function InboxPage() {
               </div>
             </div>
 
-            <button
-              onClick={() => fetchInboxData(false)}
-              disabled={loading}
-              title="Sync Supabase Leads"
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-stone-700 transition-colors cursor-pointer"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-500' : ''} />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setIsNewChatModalOpen(true)}
+                title="Message any new or random phone number"
+                className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm cursor-pointer transition-colors shrink-0"
+              >
+                <UserPlus size={13} />
+                <span className="hidden sm:inline">+ New Chat</span>
+                <span className="sm:hidden">+</span>
+              </button>
+
+              <button
+                onClick={() => fetchInboxData(false)}
+                disabled={loading}
+                title="Sync Supabase Leads"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-stone-700 transition-colors cursor-pointer"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-500' : ''} />
+              </button>
+            </div>
           </div>
 
           {/* Search Box */}
@@ -513,6 +645,7 @@ export default function InboxPage() {
             <div className="flex gap-1 overflow-x-auto pb-0.5">
               {[
                 { key: 'all', label: 'All' },
+                { key: 'custom', label: 'Custom Leads' },
                 { key: 'new', label: 'Review' },
                 { key: 'sent', label: 'Sent' },
                 { key: 'replied', label: 'Replied' },
@@ -614,7 +747,12 @@ export default function InboxPage() {
                         {previewSnippet}
                       </p>
 
-                      <div className="flex items-center gap-1.5 mt-1.5">
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        {(!lead.campaign_id || (lead.notes && (lead.notes.toLowerCase().includes('custom') || lead.notes.toLowerCase().includes('direct') || lead.notes.toLowerCase().includes('manual') || lead.notes.toLowerCase().includes('inbound')))) && (
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                            Custom
+                          </span>
+                        )}
                         <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase bg-slate-200 dark:bg-stone-800 text-slate-700 dark:text-slate-300">
                           {lead.status}
                         </span>
@@ -1147,6 +1285,110 @@ export default function InboxPage() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Direct / Random Phone WhatsApp Chat */}
+      {isNewChatModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#202c33] border border-slate-200 dark:border-stone-700 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-scale-in">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-stone-700/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-[#00a884] flex items-center justify-center">
+                  <UserPlus size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    Start New WhatsApp Chat
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Message any number directly • Filtered under Custom Leads
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsNewChatModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-stone-700 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleStartNewChat} className="space-y-3.5">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                  <Phone size={12} className="text-emerald-500" />
+                  <span>Phone Number</span>
+                  <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210 or 10 digits"
+                  value={newChatPhone}
+                  onChange={(e) => setNewChatPhone(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111b21] border border-slate-200 dark:border-stone-700 rounded-xl focus:border-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 font-medium transition-all"
+                />
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                  Indian numbers automatically format to +91.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">
+                  Name / Business Title <span className="text-slate-400 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Aryan Gupta or Local Store"
+                  value={newChatName}
+                  onChange={(e) => setNewChatName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111b21] border border-slate-200 dark:border-stone-700 rounded-xl focus:border-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 font-medium transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">
+                  First Message <span className="text-slate-400 font-normal">(Optional)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Type a message to send right now, or leave empty to just open the chat..."
+                  value={newChatMessage}
+                  onChange={(e) => setNewChatMessage(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111b21] border border-slate-200 dark:border-stone-700 rounded-xl focus:border-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 font-medium transition-all resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNewChatModalOpen(false)}
+                  disabled={isCreatingChat}
+                  className="flex-1 py-2.5 px-3 text-xs font-bold rounded-xl border border-slate-200 dark:border-stone-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingChat || !newChatPhone.trim()}
+                  className="flex-1 py-2.5 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isCreatingChat ? (
+                    <RefreshCw size={13} className="animate-spin" />
+                  ) : (
+                    <>
+                      <Send size={13} />
+                      <span>{newChatMessage.trim() ? 'Send & Start Chat' : 'Open Chat'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
