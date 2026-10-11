@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(req: Request) {
   try {
-    const { phone, pitchText, leadId, templateName = 'hello_world', languageCode = 'en_US', useTextOnly = false } = await req.json()
+    const { phone, pitchText, leadId, templateName = 'hello_world', languageCode = 'en_US', templateParams, useTextOnly = false } = await req.json()
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
@@ -26,9 +26,39 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
+    // Determine template language & dynamic parameters
+    let effectiveLang = languageCode
+    let templateComponents: any[] | undefined = undefined
+
+    if (templateName === 'no_website_pitch' || templateName === 'broken_website_pitch') {
+      effectiveLang = 'en'
+      let params = templateParams
+      if (!params || !params.length) {
+        if (leadId) {
+          const supabase = createAdminClient()
+          const { data: lead } = await supabase.from('leads').select('*').eq('id', leadId).single()
+          if (lead) {
+            const name = lead.owner_name || lead.business_name || 'there'
+            const bName = lead.business_name || 'your business'
+            const rating = lead.google_rating ? String(lead.google_rating) : '5.0'
+            const city = lead.address ? lead.address.split(',')[0].trim() : 'your city'
+            params = [name, bName, rating, city]
+          }
+        }
+      }
+      if (!params || params.length < 4) {
+        params = ['there', 'your business', '5.0', 'your city']
+      }
+
+      templateComponents = [
+        {
+          type: 'body',
+          parameters: params.map((p: string) => ({ type: 'text', text: String(p) }))
+        }
+      ]
+    }
+
     // Prepare Meta Cloud API Payload:
-    // If pitchText is provided, try sending as text first so the actual personalized message is delivered!
-    // If it's outside the 24h window (code 131047) or template is requested, we send template.
     const messageBody = pitchText || 'Hello from Synchad!'
     const tryTextFirst = Boolean(pitchText || useTextOnly)
 
@@ -51,8 +81,9 @@ export async function POST(req: Request) {
           template: {
             name: templateName,
             language: {
-              code: languageCode,
+              code: effectiveLang,
             },
+            ...(templateComponents ? { components: templateComponents } : {})
           },
         }
 
@@ -80,8 +111,9 @@ export async function POST(req: Request) {
         template: {
           name: templateName,
           language: {
-            code: languageCode,
+            code: effectiveLang,
           },
+          ...(templateComponents ? { components: templateComponents } : {})
         },
       }
       metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {

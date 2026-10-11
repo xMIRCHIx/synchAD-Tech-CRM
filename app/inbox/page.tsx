@@ -125,6 +125,12 @@ export default function InboxPage() {
       // Clean real state: No fake/mock messages. Empty conversation until real pitch is sent.
       setActiveMessages([])
     }
+
+    if (selectedLead?.site_state === 'broken') {
+      setSelectedTemplateId('broken_website_pitch')
+    } else if (selectedLead?.site_state === 'none') {
+      setSelectedTemplateId('no_website_pitch')
+    }
   }, [selectedLeadId, leads, conversations])
 
   // Filtered contacts list
@@ -164,7 +170,7 @@ export default function InboxPage() {
     sendingRef.current = true
     setIsSending(true)
 
-    const templateToUse = tmplName || selectedTemplateId || 'hello_world'
+    const templateToUse = tmplName || selectedTemplateId || 'no_website_pitch'
     const tempId = `temp-${Date.now()}`
     const newMsg: ChatMessage = {
       id: tempId,
@@ -187,6 +193,12 @@ export default function InboxPage() {
           pitchText: text,
           leadId: selectedLead.id,
           templateName: templateToUse,
+          templateParams: [
+            selectedLead.owner_name || selectedLead.business_name || 'there',
+            selectedLead.business_name || 'your business',
+            selectedLead.google_rating ? String(selectedLead.google_rating) : '5.0',
+            selectedLead.address ? selectedLead.address.split(',')[0].trim() : 'your city'
+          ],
           useTextOnly: Boolean(conversations[selectedLead.id]?.messages?.length)
         })
       })
@@ -209,7 +221,7 @@ export default function InboxPage() {
         setToast({
           id: Date.now().toString(),
           title: 'Delivered via WhatsApp API',
-          description: `Verified template (hello_world) delivered to ${selectedLead.business_name} (${selectedLead.phone}).`,
+          description: `Verified template (${templateToUse}) delivered to ${selectedLead.business_name} (${selectedLead.phone}).`,
           type: 'success'
         })
         await fetchInboxData(true)
@@ -449,8 +461,8 @@ export default function InboxPage() {
       id: 'no_website_pitch',
       name: 'no_website_pitch',
       category: 'Marketing',
-      status: 'in_review',
-      label: '⏳ no_website_pitch (In Review)',
+      status: 'active',
+      label: '🟢 no_website_pitch (Approved Active)',
       getText: (lead: any) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
@@ -463,8 +475,8 @@ export default function InboxPage() {
       id: 'broken_website_pitch',
       name: 'broken_website_pitch',
       category: 'Marketing',
-      status: 'in_review',
-      label: '⏳ broken_website_pitch (In Review)',
+      status: 'active',
+      label: '🟢 broken_website_pitch (Approved Active)',
       getText: (lead: any) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
