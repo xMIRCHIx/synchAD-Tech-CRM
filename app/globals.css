@@ -79,6 +79,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   /* Rich Deep Obsidian & Midnight Navy (Warm, Glowing, High Contrast) */
   --bg: #0D1117;
   --background: #0D1117;
@@ -706,4 +707,23 @@ input::selection, textarea::selection {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ink-faint);
+}
+
+/* Form Controls & Dropdown Dark Mode Fix */
+select {
+  color-scheme: light;
+}
+
+.dark select {
+  color-scheme: dark !important;
+}
+
+option {
+  background-color: #FFFFFF;
+  color: #0F172A;
+}
+
+.dark option {
+  background-color: #161B22 !important;
+  color: #F1F5F9 !important;
 }

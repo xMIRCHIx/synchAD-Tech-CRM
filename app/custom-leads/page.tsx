@@ -412,12 +412,12 @@ export default function CustomLeadsPage() {
               onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
             >
-              <option value="newest">Sort: Latest Added</option>
-              <option value="oldest">Sort: Oldest Added</option>
-              <option value="alpha-asc">Sort: A → Z</option>
-              <option value="alpha-desc">Sort: Z → A</option>
-              <option value="score">Sort: Highest Score</option>
-              <option value="rating">Sort: Google Rating</option>
+              <option value="newest" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Latest Added</option>
+              <option value="oldest" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Oldest Added</option>
+              <option value="alpha-asc" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: A → Z</option>
+              <option value="alpha-desc" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Z → A</option>
+              <option value="score" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Highest Score</option>
+              <option value="rating" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Google Rating</option>
             </select>
           </div>
 
@@ -429,10 +429,10 @@ export default function CustomLeadsPage() {
               onChange={(e) => setSiteFilter(e.target.value as any)}
               className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
             >
-              <option value="all">All Websites</option>
-              <option value="exists">Active Websites</option>
-              <option value="broken">Broken Links</option>
-              <option value="none">No Website</option>
+              <option value="all" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">All Websites</option>
+              <option value="exists" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Active Websites</option>
+              <option value="broken" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Broken Links</option>
+              <option value="none" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">No Website</option>
             </select>
           </div>
 
@@ -444,12 +444,12 @@ export default function CustomLeadsPage() {
               onChange={(e) => setStatusFilter(e.target.value as any)}
               className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
             >
-              <option value="all">All Stages</option>
-              <option value="review">Review</option>
-              <option value="queued">Queued</option>
-              <option value="sent">Sent</option>
-              <option value="replied">Replied</option>
-              <option value="won">Won</option>
+              <option value="all" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">All Stages</option>
+              <option value="review" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Review</option>
+              <option value="queued" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Queued</option>
+              <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sent</option>
+              <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Replied</option>
+              <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Won</option>
             </select>
           </div>
         </div>
@@ -643,11 +643,11 @@ export default function CustomLeadsPage() {
                           onChange={(e) => handleUpdateStatus(lead.id, e.target.value as LeadStatus)}
                           className="text-[11px] font-black uppercase px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-700 text-slate-900 dark:text-white outline-none cursor-pointer shadow-2xs"
                         >
-                          <option value="review">Review</option>
-                          <option value="queued">Queued</option>
-                          <option value="sent">Sent</option>
-                          <option value="replied">Replied</option>
-                          <option value="won">Won</option>
+                          <option value="review" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Review</option>
+                          <option value="queued" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Queued</option>
+                          <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sent</option>
+                          <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Replied</option>
+                          <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Won</option>
                         </select>
                       </td>
 

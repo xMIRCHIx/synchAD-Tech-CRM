@@ -44,6 +44,7 @@ export default function LeadsDashboard() {
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
   const [siteFilter, setSiteFilter] = useState<SiteState | 'all'>('all')
   const [campaignFilter, setCampaignFilter] = useState<string>('all')
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'custom' | 'campaigns'>('all')
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'alpha-asc' | 'alpha-desc' | 'score' | 'rating'>('newest')
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -126,6 +127,20 @@ export default function LeadsDashboard() {
     }
   }
 
+  const isCustomLead = (l: Lead) => {
+    return !l.campaign_id || Boolean(
+      l.notes && (
+        l.notes.toLowerCase().includes('custom') ||
+        l.notes.toLowerCase().includes('imported') ||
+        l.notes.toLowerCase().includes('manual')
+      )
+    )
+  }
+
+  const customLeadsCount = useMemo(() => {
+    return leads.filter(isCustomLead).length
+  }, [leads])
+
   // Filtered & Sorted Leads
   const processedLeads = useMemo(() => {
     let result = leads.filter((l) => {
@@ -142,7 +157,13 @@ export default function LeadsDashboard() {
       const matchesSite = siteFilter === 'all' || l.site_state === siteFilter
       const matchesCampaign = campaignFilter === 'all' || l.campaign_id === campaignFilter
 
-      return matchesSearch && matchesStatus && matchesSite && matchesCampaign
+      const isCustom = isCustomLead(l)
+      const matchesSource =
+        sourceFilter === 'all' ||
+        (sourceFilter === 'custom' && isCustom) ||
+        (sourceFilter === 'campaigns' && !isCustom)
+
+      return matchesSearch && matchesStatus && matchesSite && matchesCampaign && matchesSource
     })
 
     result.sort((a, b) => {
@@ -163,7 +184,7 @@ export default function LeadsDashboard() {
     })
 
     return result
-  }, [leads, search, statusFilter, siteFilter, campaignFilter, sortBy])
+  }, [leads, search, statusFilter, siteFilter, campaignFilter, sourceFilter, sortBy])
 
   const statusCounts = leads.reduce((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1
@@ -289,14 +310,16 @@ export default function LeadsDashboard() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
             {/* All Ingested Leads Block */}
             <div
               onClick={() => {
                 setStatusFilter('all')
                 setSiteFilter('all')
+                setCampaignFilter('all')
+                setSourceFilter('all')
               }}
-              className={`kpi-card kpi-card-indigo cursor-pointer group${statusFilter === 'all' && siteFilter === 'all' ? ' ring-2 ring-indigo-500 shadow-md' : ''}`}
+              className={`kpi-card kpi-card-indigo cursor-pointer group${statusFilter === 'all' && siteFilter === 'all' && campaignFilter === 'all' && sourceFilter === 'all' ? ' ring-2 ring-indigo-500 shadow-md' : ''}`}
               title="Click to view All Captured Leads"
             >
               <div className="flex items-center justify-between mb-2">
@@ -311,7 +334,35 @@ export default function LeadsDashboard() {
                 {leads.length}
               </div>
               <p className="kpi-sub text-xs font-black mt-2 pt-2 border-t border-indigo-300/40 dark:border-indigo-800/50 flex items-center justify-between">
-                <span>{statusFilter === 'all' && siteFilter === 'all' ? '✓ Filter Active' : 'Show All Leads'}</span>
+                <span>{sourceFilter === 'all' && statusFilter === 'all' && siteFilter === 'all' ? '✓ Filter Active' : 'Show All Leads'}</span>
+                <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+              </p>
+            </div>
+
+            {/* Custom Leads Block */}
+            <div
+              onClick={() => {
+                setSourceFilter(sourceFilter === 'custom' ? 'all' : 'custom')
+                setStatusFilter('all')
+                setSiteFilter('all')
+                setCampaignFilter('all')
+              }}
+              className={`kpi-card kpi-card-purple cursor-pointer group${sourceFilter === 'custom' ? ' ring-2 ring-purple-500 shadow-md' : ''}`}
+              title="Click to filter Custom & Imported Leads"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="kpi-title text-xs font-black uppercase tracking-wider">
+                  Custom Leads
+                </span>
+                <div className="kpi-icon-bubble w-9 h-9 rounded-xl flex items-center justify-center">
+                  <UserPlus size={17} />
+                </div>
+              </div>
+              <div className="kpi-value text-3xl sm:text-4xl font-black tracking-tight">
+                {customLeadsCount}
+              </div>
+              <p className="kpi-sub text-xs font-black mt-2 pt-2 border-t border-purple-300/40 dark:border-purple-800/50 flex items-center justify-between">
+                <span>{sourceFilter === 'custom' ? '✓ Filter Active' : 'Filter Custom Vault'}</span>
                 <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
               </p>
             </div>
@@ -453,12 +504,32 @@ export default function LeadsDashboard() {
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
               >
-                <option value="newest">Sort: Latest First</option>
-                <option value="oldest">Sort: Oldest First</option>
-                <option value="alpha-asc">Sort: A → Z (Alphabetical)</option>
-                <option value="alpha-desc">Sort: Z → A (Alphabetical)</option>
-                <option value="score">Sort: Highest Score</option>
-                <option value="rating">Sort: Google Rating</option>
+                <option value="newest" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Latest First</option>
+                <option value="oldest" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Oldest First</option>
+                <option value="alpha-asc" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: A → Z (Alphabetical)</option>
+                <option value="alpha-desc" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Z → A (Alphabetical)</option>
+                <option value="score" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Highest Score</option>
+                <option value="rating" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sort: Google Rating</option>
+              </select>
+            </div>
+
+            {/* Source Filter (All Leads vs Custom vs Scraped Campaigns) */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-700 rounded-xl text-xs shadow-2xs">
+              <UserPlus size={13} className="text-purple-600 dark:text-purple-400 font-bold" />
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as any)}
+                className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
+              >
+                <option value="all" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 py-1">
+                  All Sources ({leads.length})
+                </option>
+                <option value="custom" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 py-1">
+                  ★ Custom Leads ({customLeadsCount})
+                </option>
+                <option value="campaigns" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 py-1">
+                  📡 Scraped Campaigns ({leads.length - customLeadsCount})
+                </option>
               </select>
             </div>
 
@@ -470,9 +541,9 @@ export default function LeadsDashboard() {
                 onChange={(e) => setCampaignFilter(e.target.value)}
                 className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs max-w-[170px]"
               >
-                <option value="all">All Campaigns</option>
+                <option value="all" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">All Campaigns</option>
                 {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={c.id} className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">
                     {c.name}
                   </option>
                 ))}
@@ -487,10 +558,10 @@ export default function LeadsDashboard() {
                 onChange={(e) => setSiteFilter(e.target.value as SiteState | 'all')}
                 className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
               >
-                <option value="all">All Websites</option>
-                <option value="exists">Active Sites</option>
-                <option value="broken">Broken Sites</option>
-                <option value="none">No Website</option>
+                <option value="all" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">All Websites</option>
+                <option value="exists" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Active Sites</option>
+                <option value="broken" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Broken Sites</option>
+                <option value="none" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">No Website</option>
               </select>
             </div>
 
@@ -502,7 +573,7 @@ export default function LeadsDashboard() {
                 className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
               >
                 {PIPELINE_STATUSES.map((st) => (
-                  <option key={st.key} value={st.key}>
+                  <option key={st.key} value={st.key} className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">
                     Stage: {st.label}
                   </option>
                 ))}
@@ -680,11 +751,11 @@ export default function LeadsDashboard() {
                             onChange={(e) => handleUpdateStatus(lead.id, e.target.value as LeadStatus)}
                             className="text-[11px] font-black uppercase px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-700 text-slate-900 dark:text-white outline-none cursor-pointer shadow-2xs"
                           >
-                            <option value="review">Review</option>
-                            <option value="queued">Queued</option>
-                            <option value="sent">Sent</option>
-                            <option value="replied">Replied</option>
-                            <option value="won">Won</option>
+                            <option value="review" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Review</option>
+                            <option value="queued" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Queued</option>
+                            <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sent</option>
+                            <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Replied</option>
+                            <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Won</option>
                           </select>
                         </td>
 
