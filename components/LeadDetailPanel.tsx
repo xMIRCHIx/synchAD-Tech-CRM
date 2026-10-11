@@ -229,117 +229,77 @@ export default function LeadDetailPanel({
   const score = lead.score ?? 78
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center items-start sm:items-center p-2 sm:p-4 md:p-6 animate-fade-in overflow-y-auto" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-fade-in" role="dialog" aria-modal="true">
       {/* High-Focus Dark Backdrop */}
       <div
         className="fixed inset-0 bg-black/80 dark:bg-black/90 backdrop-blur-md transition-opacity cursor-pointer"
         onClick={onClose}
       />
 
-      {/* Large Centered Modal Box (Spacious, Beautiful, Never Cut Off) */}
-      <div className="relative w-full max-w-4xl max-h-[94vh] sm:max-h-[90vh] bg-white dark:bg-[#161B22] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-stone-800 flex flex-col overflow-hidden z-10 my-auto">
+      {/* Rock-Solid Fixed Height Modal Box (Single Internal Scrollbar, NEVER Cut Off) */}
+      <div className="relative w-full max-w-4xl h-[92vh] max-h-[850px] bg-white dark:bg-[#161B22] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-stone-800 flex flex-col overflow-hidden z-10">
         
-        {/* Modal Header (Fixed at top of modal, shrink-0) */}
-        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-stone-800 bg-slate-50/90 dark:bg-[#1C2128] flex items-start justify-between gap-3 sm:gap-4 shrink-0">
+        {/* Sleek, Compact Modal Header (Fixed at top, never clipped) */}
+        <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-slate-200 dark:border-stone-800 bg-slate-50/95 dark:bg-[#1C2128] flex items-center justify-between gap-4 shrink-0">
           <div className="flex-1 min-w-0">
-            {/* Badges Pill Row */}
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-extrabold border ${webBadge.bg}`}>
-                <WebIcon size={13} />
+            {/* Top Micro-Badges Row */}
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${webBadge.bg}`}>
+                <WebIcon size={12} />
                 {webBadge.label}
               </span>
 
-              <span className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black border ${
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black border ${
                 score >= 80
                   ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-900 dark:text-purple-200 border-purple-300 dark:border-purple-700'
                   : 'bg-slate-100 dark:bg-stone-800 text-slate-800 dark:text-slate-200 border-slate-300'
               }`}>
-                Opportunity Score: {score}/100
+                Score: {score}/100
               </span>
 
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-mono uppercase bg-slate-200 dark:bg-stone-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-stone-700 font-bold">
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono uppercase bg-slate-200 dark:bg-stone-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-stone-700 font-bold">
                 {lead.status}
               </span>
 
               {lead.campaigns?.name && (
-                <span className="text-xs px-3 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-800 font-bold">
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-800 font-bold truncate max-w-[180px]">
                   {lead.campaigns.name}
                 </span>
               )}
             </div>
 
-            {/* Business Title & Google Rating */}
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            {/* Business Title, Rating & Quick Phone */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight truncate max-w-[320px] sm:max-w-md">
                 {lead.business_name}
               </h2>
               {lead.google_rating && (
-                <span className="text-sm font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 px-2.5 py-0.5 rounded-lg flex items-center gap-1">
-                  ★ {lead.google_rating} on Google
+                <span className="text-xs font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                  ★ {lead.google_rating}
                 </span>
               )}
-            </div>
-
-            {/* Unclipped Full Location Address Box */}
-            <div className="mt-3 p-3.5 bg-white dark:bg-stone-900 rounded-2xl border border-slate-200 dark:border-stone-700 shadow-2xs flex items-start gap-2.5">
-              <MapPin size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <span className="font-extrabold text-[11px] uppercase text-slate-500 dark:text-slate-400 block mb-0.5 tracking-wider">
-                  Full Location Address:
-                </span>
-                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
-                  {lead.address || 'Address not listed on Google profile'}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick External Links & Large Phone Pill */}
-            <div className="mt-3 flex flex-wrap items-center gap-2.5 text-xs">
-              {/* Prominent Large Phone Display */}
-              <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 flex items-center gap-2 shadow-2xs">
-                <Phone size={14} className="text-emerald-600 dark:text-emerald-400" />
-                <span className="font-mono text-sm font-black tracking-wide">{lead.phone}</span>
+              {/* Phone Quick Pill */}
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 text-xs font-mono font-bold shrink-0">
+                <Phone size={11} className="text-emerald-600" />
+                <span>{lead.phone}</span>
                 <button
                   onClick={handleCopyPhone}
-                  className="ml-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline cursor-pointer"
+                  className="ml-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline cursor-pointer"
                 >
-                  {copiedPhone ? '✓ Copied' : 'Copy'}
+                  {copiedPhone ? '✓' : 'Copy'}
                 </button>
               </div>
-
-              <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 flex items-center gap-1.5 font-bold transition-all shadow-2xs"
-              >
-                <Compass size={14} /> Open in Google Maps <ExternalLink size={12} />
-              </a>
-
-              {lead.website_url ? (
-                <a
-                  href={lead.website_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-100 flex items-center gap-1.5 font-bold transition-all shadow-2xs"
-                >
-                  <Globe size={14} /> Visit Website <ExternalLink size={12} />
-                </a>
-              ) : (
-                <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-stone-700 text-xs font-semibold">
-                  No Website Registered
-                </span>
-              )}
             </div>
           </div>
 
-          {/* Close Button */}
+          {/* Prominent High-Contrast Close Button */}
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-2xl bg-white dark:bg-stone-800 border border-slate-200 dark:border-stone-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shadow-xs shrink-0"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white dark:bg-stone-800 border border-slate-300 dark:border-stone-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-all cursor-pointer shadow-sm shrink-0"
             aria-label="Close dialog"
+            title="Close (Esc)"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -452,12 +412,50 @@ export default function LeadDetailPanel({
           </button>
         </div>
 
-        {/* Tab Content Area (Scrollable, High Contrast, NEVER Cut Off) */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 md:p-8 bg-white dark:bg-[#161B22] space-y-5 sm:space-y-6">
+        {/* Tab Content Area (Scrollable, High Contrast, ONE single scrollbar) */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 md:p-8 bg-white dark:bg-[#161B22] space-y-4 sm:space-y-5">
+          {/* Quick Info Bar: Full Address & Direct Links */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start gap-2.5 flex-1 min-w-[240px]">
+              <MapPin size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+              <div className="flex-1 text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                <span className="text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400 block tracking-wider">
+                  Location Address
+                </span>
+                {lead.address || 'Address not listed on Google profile'}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 flex items-center gap-1.5 text-xs font-bold transition-all shadow-2xs"
+              >
+                <Compass size={13} /> Maps <ExternalLink size={11} />
+              </a>
+
+              {lead.website_url ? (
+                <a
+                  href={lead.website_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-100 flex items-center gap-1.5 text-xs font-bold transition-all shadow-2xs"
+                >
+                  <Globe size={13} /> Website <ExternalLink size={11} />
+                </a>
+              ) : (
+                <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-stone-700 text-xs font-semibold">
+                  No Website
+                </span>
+              )}
+            </div>
+          </div>
 
           {/* TAB 1: WHY PITCH THIS BUSINESS (Deep Strategy Breakdown) */}
           {activeTab === 'strategy' && (
-            <div className="space-y-6 animate-fade-in">
+            <div className="space-y-5 animate-fade-in">
               {/* Situation Banner (Tinted Pastel with Deep Charcoal Text) */}
               <div className={`p-6 rounded-3xl ${strategy.badgeColor} space-y-3 shadow-xs`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
