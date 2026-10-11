@@ -88,6 +88,8 @@ export async function POST(req: Request) {
                 .eq('id', lead.id)
             }
 
+            if (!lead) continue
+
             // B. Find or create conversation for this lead
             let { data: conv } = await supabase
               .from('conversations')
@@ -122,6 +124,8 @@ export async function POST(req: Request) {
                 })
                 .eq('id', conv.id)
             }
+
+            if (!conv) continue
 
             // C. Insert message into messages table
             const { error: msgInsertErr } = await supabase
