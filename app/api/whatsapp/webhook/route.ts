@@ -23,19 +23,31 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    if (body.object !== 'whatsapp_business_account') {
+    // Accept both standard WhatsApp webhook payloads and Meta developer test tool payloads
+    const values: any[] = []
+    if (body.entry && Array.isArray(body.entry)) {
+      for (const entry of body.entry) {
+        for (const change of entry.changes || []) {
+          if (change?.value) values.push(change.value)
+        }
+      }
+    } else if (body.value) {
+      values.push(body.value)
+    } else if (body.changes && Array.isArray(body.changes)) {
+      for (const change of body.changes) {
+        if (change?.value) values.push(change.value)
+      }
+    }
+
+    if (values.length === 0) {
       return NextResponse.json({ status: 'ignored' }, { status: 200 })
     }
 
     const supabase = createAdminClient()
 
-    for (const entry of body.entry || []) {
-      for (const change of entry.changes || []) {
-        const value = change.value
-        if (!value) continue
-
-        // 1. Process Inbound Messages
-        if (value.messages && value.messages.length > 0) {
+    for (const value of values) {
+      // 1. Process Inbound Messages
+      if (value.messages && value.messages.length > 0) {
           for (const msg of value.messages) {
             const rawFrom = String(msg.from || '').replace(/[^\d]/g, '')
             if (!rawFrom) continue
@@ -164,7 +176,6 @@ export async function POST(req: Request) {
           }
         }
       }
-    }
 
     return NextResponse.json({ status: 'success' }, { status: 200 })
   } catch (error: any) {
