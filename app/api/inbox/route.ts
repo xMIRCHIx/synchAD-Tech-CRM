@@ -163,3 +163,73 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const leadId = searchParams.get('leadId')
+    const action = searchParams.get('action') || 'clear_chat' // 'clear_chat' | 'delete_lead'
+
+    if (!leadId) {
+      return NextResponse.json({ error: 'leadId is required' }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+
+    // 1. Find conversation for this lead
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', leadId)
+      .maybeSingle()
+
+    if (conv) {
+      // Delete all messages in this conversation
+      const { error: msgDelErr } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conv.id)
+
+      if (msgDelErr) throw msgDelErr
+    }
+
+    if (action === 'delete_lead') {
+      // Also delete conversation
+      if (conv) {
+        await supabase.from('conversations').delete().eq('id', conv.id)
+      }
+      // Delete website_audits
+      await supabase.from('website_audits').delete().eq('lead_id', leadId)
+      // Delete lead
+      const { error: leadDelErr } = await supabase.from('leads').delete().eq('id', leadId)
+      if (leadDelErr) throw leadDelErr
+
+      return NextResponse.json({ success: true, action: 'delete_lead' })
+    } else {
+      // For clear_chat, reset conversation unread count and last_message_at
+      if (conv) {
+        await supabase
+          .from('conversations')
+          .update({
+            unread_count: 0,
+            last_message_at: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', conv.id)
+      }
+      // Reset lead status to review / new
+      await supabase
+        .from('leads')
+        .update({
+          status: 'new',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId)
+
+      return NextResponse.json({ success: true, action: 'clear_chat' })
+    }
+  } catch (error: any) {
+    console.error('[Inbox DELETE] Error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}

@@ -6,7 +6,7 @@ import {
   MessageSquare, MessageCircle, Phone, Search, CheckCheck, Send,
   Sparkles, ExternalLink, Globe, MapPin, Check, Copy,
   PartyPopper, RefreshCw, PanelRight, X, AlertTriangle, ShieldCheck,
-  ChevronLeft, ArrowUpRight, Clock, Star, Flame, UserCheck
+  ChevronLeft, ArrowUpRight, Clock, Star, Flame, UserCheck, Trash2, Eraser
 } from 'lucide-react'
 import Toast, { ToastMessage } from '@/components/Toast'
 import type { Lead, LeadStatus, SiteState } from '@/lib/types'
@@ -38,6 +38,12 @@ export default function InboxPage() {
   const [copiedPhone, setCopiedPhone] = useState(false)
   const [copiedPitch, setCopiedPitch] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('hello_world')
+  const [deleteMenuOpen, setDeleteMenuOpen] = useState(false)
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; action: 'clear_chat' | 'delete_lead' | null }>({
+    open: false,
+    action: null
+  })
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const sendingRef = useRef(false)
@@ -248,6 +254,64 @@ export default function InboxPage() {
     navigator.clipboard.writeText(selectedLead.phone)
     setCopiedPhone(true)
     setTimeout(() => setCopiedPhone(false), 2000)
+  }
+
+  // Delete Lead or Clear Chat History
+  async function handleConfirmDelete() {
+    if (!selectedLead || !confirmModal.action) return
+    setIsDeleting(true)
+    const action = confirmModal.action
+    const currentLeadId = selectedLead.id
+    const leadName = selectedLead.business_name
+
+    try {
+      const res = await fetch(`/api/inbox?leadId=${currentLeadId}&action=${action}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        if (action === 'delete_lead') {
+          const updated = leads.filter((l) => l.id !== currentLeadId)
+          setLeads(updated)
+          setSelectedLeadId(updated.length > 0 ? updated[0].id : null)
+          setToast({
+            id: String(Date.now()),
+            title: 'Lead Removed',
+            description: `${leadName} and all conversations were deleted.`,
+            type: 'info'
+          })
+        } else {
+          setActiveMessages([])
+          setConversations((prev) => ({
+            ...prev,
+            [currentLeadId]: {
+              ...prev[currentLeadId],
+              messages: []
+            }
+          }))
+          setToast({
+            id: String(Date.now()),
+            title: 'Chat History Cleared',
+            description: `All message history cleared for ${leadName}.`,
+            type: 'info'
+          })
+        }
+      } else {
+        throw new Error(data.error || 'Failed to perform delete')
+      }
+    } catch (err: any) {
+      setToast({
+        id: String(Date.now()),
+        title: 'Delete Failed',
+        description: err.message,
+        type: 'error'
+      })
+    } finally {
+      setIsDeleting(false)
+      setConfirmModal({ open: false, action: null })
+      setDeleteMenuOpen(false)
+    }
   }
 
   // Official Meta WhatsApp Message Templates
@@ -665,6 +729,57 @@ export default function InboxPage() {
                     <ArrowUpRight size={16} />
                   </button>
 
+                  {/* Delete / Clear Chat Menu */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setDeleteMenuOpen(!deleteMenuOpen)}
+                      title="Delete chat or contact options"
+                      className="p-2 rounded-xl text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-transparent hover:border-rose-200 dark:hover:border-rose-800 transition-colors cursor-pointer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                    {deleteMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setDeleteMenuOpen(false)}
+                        />
+                        <div className="absolute right-0 top-full mt-1.5 w-56 bg-white dark:bg-[#202c33] border border-slate-200 dark:border-stone-700 rounded-2xl shadow-xl z-50 p-1.5 animate-scale-in text-xs">
+                          <button
+                            onClick={() => {
+                              setDeleteMenuOpen(false)
+                              setConfirmModal({ open: true, action: 'clear_chat' })
+                            }}
+                            className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-stone-700/60 font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2.5 transition-colors cursor-pointer"
+                          >
+                            <Eraser size={14} className="text-amber-500 shrink-0" />
+                            <div>
+                              <p className="font-bold">Clear Chat History</p>
+                              <p className="text-[10px] text-slate-400">Delete messages, keep lead</p>
+                            </div>
+                          </button>
+
+                          <div className="my-1 border-t border-slate-100 dark:border-stone-700/50" />
+
+                          <button
+                            onClick={() => {
+                              setDeleteMenuOpen(false)
+                              setConfirmModal({ open: true, action: 'delete_lead' })
+                            }}
+                            className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-2.5 transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={14} className="text-rose-500 shrink-0" />
+                            <div>
+                              <p className="font-bold">Delete Lead & Chat</p>
+                              <p className="text-[10px] text-rose-400/80">Completely remove from CRM</p>
+                            </div>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   {/* Toggle Right Dossier (Flaws & Intelligence) */}
                   <button
                     onClick={() => setShowDossier(!showDossier)}
@@ -984,6 +1099,57 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal: Clear Chat or Delete Lead */}
+      {confirmModal.open && selectedLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-[#202c33] border border-slate-200 dark:border-stone-700 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-scale-in">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
+              confirmModal.action === 'delete_lead'
+                ? 'bg-rose-500/10 border border-rose-500/20 text-rose-500'
+                : 'bg-amber-500/10 border border-amber-500/20 text-amber-500'
+            }`}>
+              {confirmModal.action === 'delete_lead' ? <Trash2 size={24} /> : <Eraser size={24} />}
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                {confirmModal.action === 'delete_lead' ? 'Delete Contact & Messages?' : 'Clear Chat History?'}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                {confirmModal.action === 'delete_lead'
+                  ? `Are you sure you want to completely remove "${selectedLead.business_name}" (${selectedLead.phone}) and all its messages from CRM?`
+                  : `Are you sure you want to delete all messages for "${selectedLead.business_name}"? The contact will remain in your lead list.`}
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                onClick={() => setConfirmModal({ open: false, action: null })}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 px-3 text-xs font-bold rounded-xl border border-slate-200 dark:border-stone-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl text-white shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                  confirmModal.action === 'delete_lead'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                {isDeleting ? (
+                  <RefreshCw size={13} className="animate-spin" />
+                ) : (
+                  confirmModal.action === 'delete_lead' ? 'Yes, Delete' : 'Yes, Clear'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
