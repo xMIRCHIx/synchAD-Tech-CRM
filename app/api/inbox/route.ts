@@ -44,6 +44,19 @@ export async function GET() {
     const convMap: Record<string, any> = {}
     if (conversations) {
       for (const c of conversations) {
+        if (c.messages && Array.isArray(c.messages)) {
+          const sorted = [...c.messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          const unique: any[] = []
+          for (const m of sorted) {
+            const isDuplicate = unique.some(existing => {
+              if (existing.direction !== m.direction || existing.body !== m.body) return false
+              const diff = Math.abs(new Date(existing.created_at).getTime() - new Date(m.created_at).getTime())
+              return diff < 8000
+            })
+            if (!isDuplicate) unique.push(m)
+          }
+          c.messages = unique
+        }
         convMap[c.lead_id] = c
       }
     }

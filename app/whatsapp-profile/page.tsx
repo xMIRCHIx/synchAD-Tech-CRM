@@ -26,22 +26,7 @@ interface ProfileData {
 }
 
 export default function WhatsAppProfilePage() {
-  const [profile, setProfile] = useState<ProfileData>({
-    display_name: 'Synchad',
-    phone_number: '+91 70675 49982',
-    phone_number_id: '1268131546394409',
-    waba_id: '1114054964346569',
-    vertical: 'PROF_SERVICES',
-    about: 'Autonomous B2B Growth Engine • WhatsApp CRM',
-    description: 'Synchad delivers autonomous B2B lead generation, website conversion audits, and 1-tap WhatsApp booking pipelines for modern businesses.',
-    email: 'contact@synchad.online',
-    address: 'India',
-    websites: ['https://synchad.online/'],
-    profile_picture_url: '',
-    quality_rating: 'HIGH',
-    verified: true,
-  })
-
+  const [profile, setProfile] = useState<ProfileData | null>(null)
   const [categories, setCategories] = useState<{ value: string; label: string }[]>([])
   const [metaStatus, setMetaStatus] = useState<any>({ connected: false, status: 'loading' })
   const [loading, setLoading] = useState(true)
@@ -76,11 +61,27 @@ export default function WhatsAppProfilePage() {
     }
   }
 
+  const currentProfile: ProfileData = profile || {
+    display_name: 'Synchad',
+    phone_number: '+91 70675 49982',
+    phone_number_id: '1268131546394409',
+    waba_id: '1114054964346569',
+    vertical: 'PROF_SERVICES',
+    about: '',
+    description: '',
+    email: '',
+    address: '',
+    websites: ['https://synchad.online/'],
+    profile_picture_url: '',
+    quality_rating: 'HIGH',
+    verified: true,
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
-      const payload: any = { ...profile }
+      const payload: any = { ...currentProfile }
       if (newTokenInput.trim()) {
         payload.accessToken = newTokenInput.trim()
       }
@@ -128,8 +129,40 @@ export default function WhatsAppProfilePage() {
   }
 
   const categoryLabel =
-    categories.find((c) => c.value === profile.vertical)?.label ||
-    (profile.vertical === 'PROF_SERVICES' ? 'Professional Services' : profile.vertical)
+    categories.find((c) => c.value === currentProfile.vertical)?.label ||
+    (currentProfile.vertical === 'PROF_SERVICES' ? 'Professional Services' : currentProfile.vertical)
+
+  if (loading && !profile) {
+    return (
+      <div className="p-4 sm:p-6 md:p-8 max-w-[1240px] mx-auto space-y-7 animate-fade-in pb-28">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[var(--line)]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+              <MessageCircle size={18} />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-[var(--foreground)] flex items-center gap-2">
+              Official WhatsApp Business Profile
+            </h1>
+            <span className="badge badge-good text-[10px] uppercase font-bold tracking-wider px-2 py-0.5">
+              <ShieldCheck size={12} className="text-emerald-500" /> Meta Verified
+            </span>
+          </div>
+        </div>
+
+        <div className="min-h-[460px] flex flex-col items-center justify-center p-12 text-center rounded-3xl bg-[var(--surface)] border border-[var(--line)] shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 mb-4">
+            <RefreshCw size={28} className="animate-spin" />
+          </div>
+          <h2 className="text-base font-extrabold text-[var(--foreground)]">
+            Loading Live Meta Profile...
+          </h2>
+          <p className="text-xs text-[var(--ink-muted)] mt-1.5 max-w-sm">
+            Fetching verified credentials, business bio, and registered phone details directly from Meta Cloud API.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-[1240px] mx-auto space-y-7 animate-fade-in pb-28">
@@ -205,7 +238,7 @@ export default function WhatsAppProfilePage() {
                     : 'Meta WhatsApp Status'}
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/10 dark:bg-white/10">
-                  Phone ID: {profile.phone_number_id}
+                  Phone ID: {currentProfile.phone_number_id}
                 </span>
               </p>
               <p className="text-[11px] opacity-90 mt-0.5">
@@ -316,10 +349,10 @@ export default function WhatsAppProfilePage() {
             <div className="relative pt-6 flex flex-col items-center text-center">
               <div className="w-24 h-24 rounded-full bg-[var(--surface)] p-1.5 shadow-xl ring-4 ring-emerald-500/20 relative group">
                 <div className="w-full h-full rounded-full bg-gradient-to-tr from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 border border-[var(--line)] flex items-center justify-center overflow-hidden">
-                  {profile.profile_picture_url ? (
+                  {currentProfile.profile_picture_url ? (
                     <img
-                      src={profile.profile_picture_url}
-                      alt={profile.display_name}
+                      src={currentProfile.profile_picture_url}
+                      alt={currentProfile.display_name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -338,11 +371,11 @@ export default function WhatsAppProfilePage() {
               {/* Business Name & Number */}
               <div className="mt-3">
                 <h3 className="text-xl font-black text-[var(--foreground)] flex items-center justify-center gap-1.5">
-                  <span>{profile.display_name || 'Synchad'}</span>
+                  <span>{currentProfile.display_name || 'Synchad'}</span>
                   <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
                 </h3>
                 <p className="text-xs font-semibold text-[var(--ink-muted)] mt-0.5">
-                  {profile.phone_number || '+91 70675 49982'}
+                  {currentProfile.phone_number || '+91 70675 49982'}
                 </p>
                 <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
                   <Building2 size={12} />
@@ -380,7 +413,7 @@ export default function WhatsAppProfilePage() {
                   Business Description
                 </p>
                 <p className="text-[var(--foreground)] text-xs leading-relaxed bg-[var(--surface-alt)] p-3 rounded-xl border border-[var(--line)]">
-                  {profile.description || 'No description provided.'}
+                  {currentProfile.description || 'No description provided.'}
                 </p>
               </div>
 
@@ -391,37 +424,37 @@ export default function WhatsAppProfilePage() {
                 </p>
                 <div className="flex items-center gap-2 p-2.5 bg-[var(--surface-alt)] rounded-xl border border-[var(--line)] text-xs font-medium text-[var(--foreground)]">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="truncate">{profile.about || 'Available'}</span>
+                  <span className="truncate">{currentProfile.about || 'Available'}</span>
                 </div>
               </div>
 
               {/* Contact Info */}
               <div className="space-y-2 pt-2 border-t border-[var(--line)]">
-                {profile.websites && profile.websites.length > 0 && profile.websites[0] && (
+                {currentProfile.websites && currentProfile.websites.length > 0 && currentProfile.websites[0] && (
                   <div className="flex items-center gap-2.5 text-xs text-[var(--foreground)]">
                     <Globe size={14} className="text-indigo-500 shrink-0" />
                     <a
-                      href={profile.websites[0]}
+                      href={currentProfile.websites[0]}
                       target="_blank"
                       rel="noreferrer"
                       className="text-indigo-600 dark:text-indigo-400 hover:underline truncate font-semibold"
                     >
-                      {profile.websites[0]}
+                      {currentProfile.websites[0]}
                     </a>
                   </div>
                 )}
 
-                {profile.email && (
+                {currentProfile.email && (
                   <div className="flex items-center gap-2.5 text-xs text-[var(--foreground)]">
                     <Mail size={14} className="text-amber-500 shrink-0" />
-                    <span className="truncate">{profile.email}</span>
+                    <span className="truncate">{currentProfile.email}</span>
                   </div>
                 )}
 
-                {profile.address && (
+                {currentProfile.address && (
                   <div className="flex items-center gap-2.5 text-xs text-[var(--foreground)]">
                     <MapPin size={14} className="text-rose-500 shrink-0" />
-                    <span className="truncate">{profile.address}</span>
+                    <span className="truncate">{currentProfile.address}</span>
                   </div>
                 )}
               </div>
@@ -467,8 +500,8 @@ export default function WhatsAppProfilePage() {
                   </label>
                   <input
                     type="text"
-                    value={profile.display_name}
-                    onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
+                    value={currentProfile.display_name}
+                    onChange={(e) => setProfile({ ...currentProfile, display_name: e.target.value })}
                     placeholder="e.g. Synchad"
                     className="form-input text-xs font-semibold"
                     required
@@ -484,8 +517,8 @@ export default function WhatsAppProfilePage() {
                   </label>
                   <input
                     type="text"
-                    value={profile.phone_number}
-                    onChange={(e) => setProfile({ ...profile, phone_number: e.target.value })}
+                    value={currentProfile.phone_number}
+                    onChange={(e) => setProfile({ ...currentProfile, phone_number: e.target.value })}
                     placeholder="+91..."
                     className="form-input text-xs font-mono"
                     readOnly
@@ -507,8 +540,8 @@ export default function WhatsAppProfilePage() {
                   </span>
                 </div>
                 <select
-                  value={profile.vertical}
-                  onChange={(e) => setProfile({ ...profile, vertical: e.target.value })}
+                  value={currentProfile.vertical}
+                  onChange={(e) => setProfile({ ...currentProfile, vertical: e.target.value })}
                   className="form-input text-xs font-semibold cursor-pointer"
                 >
                   {categories.map((cat) => (
@@ -530,15 +563,15 @@ export default function WhatsAppProfilePage() {
                 <div className="flex gap-2">
                   <input
                     type="url"
-                    value={profile.profile_picture_url || ''}
-                    onChange={(e) => setProfile({ ...profile, profile_picture_url: e.target.value })}
+                    value={currentProfile.profile_picture_url || ''}
+                    onChange={(e) => setProfile({ ...currentProfile, profile_picture_url: e.target.value })}
                     placeholder="https://.../synchad-logo.png"
                     className="form-input text-xs flex-1 font-mono"
                   />
-                  {profile.profile_picture_url && (
+                  {currentProfile.profile_picture_url && (
                     <button
                       type="button"
-                      onClick={() => setProfile({ ...profile, profile_picture_url: '' })}
+                      onClick={() => setProfile({ ...currentProfile, profile_picture_url: '' })}
                       className="btn btn-secondary px-3 py-1.5 text-xs rounded-xl"
                     >
                       Reset
@@ -557,16 +590,16 @@ export default function WhatsAppProfilePage() {
                     WhatsApp About / Status
                   </label>
                   <span className={`text-[10px] font-mono ${
-                    (profile.about?.length || 0) > 139 ? 'text-rose-500 font-bold' : 'text-[var(--ink-muted)]'
+                    (currentProfile.about?.length || 0) > 139 ? 'text-rose-500 font-bold' : 'text-[var(--ink-muted)]'
                   }`}>
-                    {profile.about?.length || 0} / 139
+                    {currentProfile.about?.length || 0} / 139
                   </span>
                 </div>
                 <input
                   type="text"
                   maxLength={139}
-                  value={profile.about}
-                  onChange={(e) => setProfile({ ...profile, about: e.target.value })}
+                  value={currentProfile.about}
+                  onChange={(e) => setProfile({ ...currentProfile, about: e.target.value })}
                   placeholder="e.g. Autonomous B2B Growth Engine • WhatsApp CRM"
                   className="form-input text-xs"
                 />
@@ -579,16 +612,16 @@ export default function WhatsAppProfilePage() {
                     Business Description (Bio)
                   </label>
                   <span className={`text-[10px] font-mono ${
-                    (profile.description?.length || 0) > 512 ? 'text-rose-500 font-bold' : 'text-[var(--ink-muted)]'
+                    (currentProfile.description?.length || 0) > 512 ? 'text-rose-500 font-bold' : 'text-[var(--ink-muted)]'
                   }`}>
-                    {profile.description?.length || 0} / 512
+                    {currentProfile.description?.length || 0} / 512
                   </span>
                 </div>
                 <textarea
                   rows={3}
                   maxLength={512}
-                  value={profile.description}
-                  onChange={(e) => setProfile({ ...profile, description: e.target.value })}
+                  value={currentProfile.description}
+                  onChange={(e) => setProfile({ ...currentProfile, description: e.target.value })}
                   placeholder="Describe your agency or business services..."
                   className="form-input text-xs leading-relaxed resize-none"
                 />
@@ -602,8 +635,8 @@ export default function WhatsAppProfilePage() {
                   </label>
                   <input
                     type="email"
-                    value={profile.email}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    value={currentProfile.email}
+                    onChange={(e) => setProfile({ ...currentProfile, email: e.target.value })}
                     placeholder="contact@synchad.online"
                     className="form-input text-xs"
                   />
@@ -615,8 +648,8 @@ export default function WhatsAppProfilePage() {
                   </label>
                   <input
                     type="url"
-                    value={profile.websites?.[0] || ''}
-                    onChange={(e) => setProfile({ ...profile, websites: [e.target.value] })}
+                    value={currentProfile.websites?.[0] || ''}
+                    onChange={(e) => setProfile({ ...currentProfile, websites: [e.target.value] })}
                     placeholder="https://synchad.online"
                     className="form-input text-xs font-mono"
                   />
@@ -629,8 +662,8 @@ export default function WhatsAppProfilePage() {
                 </label>
                 <input
                   type="text"
-                  value={profile.address}
-                  onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                  value={currentProfile.address}
+                  onChange={(e) => setProfile({ ...currentProfile, address: e.target.value })}
                   placeholder="e.g. India"
                   className="form-input text-xs"
                 />
@@ -649,11 +682,11 @@ export default function WhatsAppProfilePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono text-[var(--ink-muted)]">
                   <div className="p-2 bg-[var(--surface)] rounded-xl border border-[var(--line)]">
                     <span className="block text-[9px] uppercase font-bold text-[var(--ink-muted)]">Phone Number ID</span>
-                    <span className="text-[var(--foreground)] font-bold">{profile.phone_number_id}</span>
+                    <span className="text-[var(--foreground)] font-bold">{currentProfile.phone_number_id}</span>
                   </div>
                   <div className="p-2 bg-[var(--surface)] rounded-xl border border-[var(--line)]">
                     <span className="block text-[9px] uppercase font-bold text-[var(--ink-muted)]">WABA ID</span>
-                    <span className="text-[var(--foreground)] font-bold">{profile.waba_id}</span>
+                    <span className="text-[var(--foreground)] font-bold">{currentProfile.waba_id}</span>
                   </div>
                 </div>
               </div>

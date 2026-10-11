@@ -131,6 +131,25 @@ export async function GET() {
         if (metaLive.websites) profile.websites = metaLive.websites
         if (metaLive.profile_picture_url) profile.profile_picture_url = metaLive.profile_picture_url
 
+        // Also query verified phone details directly from Meta
+        try {
+          const phoneRes = await fetch(
+            `https://graph.facebook.com/v21.0/${phoneId}?fields=display_phone_number,verified_name,quality_rating`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              cache: 'no-store',
+            }
+          )
+          const phoneData = await phoneRes.json()
+          if (phoneRes.ok && phoneData) {
+            if (phoneData.verified_name) profile.display_name = phoneData.verified_name
+            if (phoneData.display_phone_number) profile.phone_number = phoneData.display_phone_number
+            if (phoneData.quality_rating) profile.quality_rating = phoneData.quality_rating
+          }
+        } catch (phoneErr) {
+          console.error('[Meta Phone Query Error]:', phoneErr)
+        }
+
         writeLocalProfile(profile)
       } else {
         const errMsg = metaData.error?.message || 'Meta API returned an error'

@@ -19,13 +19,11 @@ interface ChatMessage {
   status?: 'sent' | 'delivered' | 'read'
 }
 
-let cachedInboxData: { leads: Lead[]; conversations: Record<string, any> } | null = null
-
 export default function InboxPage() {
-  const [leads, setLeads] = useState<Lead[]>(cachedInboxData?.leads || [])
-  const [conversations, setConversations] = useState<Record<string, any>>(cachedInboxData?.conversations || {})
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(cachedInboxData?.leads?.[0]?.id || null)
-  const [loading, setLoading] = useState(!cachedInboxData)
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [conversations, setConversations] = useState<Record<string, any>>({})
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterTab, setFilterTab] = useState<'all' | 'new' | 'sent' | 'replied' | 'won'>('all')
   const [showDossier, setShowDossier] = useState(false)
@@ -42,9 +40,10 @@ export default function InboxPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('hello_world')
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const sendingRef = useRef(false)
 
   useEffect(() => {
-    fetchInboxData(Boolean(cachedInboxData))
+    fetchInboxData(false)
     checkTokenStatus()
 
     // Real-time polling every 4 seconds to catch inbound WhatsApp replies instantly
@@ -69,10 +68,9 @@ export default function InboxPage() {
   async function fetchInboxData(silent = false) {
     if (!silent) setLoading(true)
     try {
-      const res = await fetch('/api/inbox')
+      const res = await fetch('/api/inbox', { cache: 'no-store' })
       const data = await res.json()
       if (data.leads && data.leads.length > 0) {
-        cachedInboxData = { leads: data.leads, conversations: data.conversations || {} }
         setLeads(data.leads)
         setConversations(data.conversations || {})
         setSelectedLeadId((prev) => prev || data.leads[0].id)
@@ -133,15 +131,19 @@ export default function InboxPage() {
     return true
   })
 
-  // Handle Send Message
+  // Handle Send Message (Single Atomic Dispatch to Meta + Supabase)
   async function handleSendMessage(textToSend?: string, tmplName?: string) {
-    const templateToUse = tmplName || selectedTemplateId || 'hello_world'
+    if (sendingRef.current || isSending) return
     const text = (textToSend || inputText || activePitchText).trim()
     if (!text || !selectedLead) return
 
+    sendingRef.current = true
     setIsSending(true)
+
+    const templateToUse = tmplName || selectedTemplateId || 'hello_world'
+    const tempId = `temp-${Date.now()}`
     const newMsg: ChatMessage = {
-      id: Date.now().toString(),
+      id: tempId,
       direction: 'outbound',
       body: text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -152,18 +154,7 @@ export default function InboxPage() {
     setInputText('')
 
     try {
-      // 1. Post to Inbox API
-      await fetch('/api/inbox', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          leadId: selectedLead.id,
-          body: text,
-          direction: 'outbound'
-        })
-      })
-
-      // 2. Dispatch to WhatsApp API (uses verified hello_world template by default)
+      // Dispatch exclusively to WhatsApp API (sends to Meta and records single message to Supabase)
       const waRes = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,7 +188,7 @@ export default function InboxPage() {
           description: `Verified template (hello_world) delivered to ${selectedLead.business_name} (${selectedLead.phone}).`,
           type: 'success'
         })
-        fetchInboxData(true)
+        await fetchInboxData(true)
       }
     } catch (err: any) {
       console.error(err)
@@ -208,6 +199,7 @@ export default function InboxPage() {
         type: 'error'
       })
     } finally {
+      sendingRef.current = false
       setIsSending(false)
     }
   }
@@ -849,7 +841,7 @@ export default function InboxPage() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
-                    handleSendMessage()
+                    if (!isSending) handleSendMessage()
                   }}
                   className="flex items-center gap-2 max-w-5xl mx-auto"
                 >
@@ -858,13 +850,8 @@ export default function InboxPage() {
                     placeholder="Type your WhatsApp message or pitch (Press Enter to send)..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage()
-                      }
-                    }}
-                    className="flex-1 py-3 px-4 bg-slate-100 dark:bg-[#2a3942] border border-transparent focus:border-[#00a884] focus:bg-white dark:focus:bg-[#111b21] rounded-2xl text-xs font-medium outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all shadow-inner"
+                    disabled={isSending}
+                    className="flex-1 py-3 px-4 bg-slate-100 dark:bg-[#2a3942] border border-transparent focus:border-[#00a884] focus:bg-white dark:focus:bg-[#111b21] rounded-2xl text-xs font-medium outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all shadow-inner disabled:opacity-60"
                   />
                   <button
                     type="submit"
