@@ -65,7 +65,10 @@ export default function LeadDetailPanel({
   // Dynamic Strategy Reasoning depending on website existence (High Contrast Palettes)
   const getStrategicWhyPitch = () => {
     const biz = lead.business_name
-    const cat = lead.campaigns?.niche || 'Local Business'
+    const rawCat = lead.campaigns?.niche
+    const cat = rawCat && rawCat !== 'Local Business' ? rawCat : null
+    const searchTarget = cat ? `"${cat}"` : `businesses like "${biz}" or services nearby`
+    const nicheTarget = cat ? `for ${cat}` : 'for modern businesses'
 
     if (lead.site_state === 'none') {
       return {
@@ -74,9 +77,9 @@ export default function LeadDetailPanel({
         badgeColor: 'bg-amber-100 dark:bg-amber-950/70 border-2 border-amber-300 dark:border-amber-600',
         tagBg: 'bg-amber-500 text-white font-black shadow-xs',
         textColor: 'text-amber-950 dark:text-amber-100',
-        whyPitch: `This business has an active Google Maps profile with positive customer reviews, but ZERO website or landing page. When local customers search for "${cat}", they click competitor profiles who provide instant 1-tap WhatsApp booking and pricing menus.`,
+        whyPitch: `This business has an active Google Maps profile with positive customer reviews, but ZERO website or landing page. When local customers search for ${searchTarget}, they click competitor profiles who provide instant 1-tap WhatsApp booking and pricing menus.`,
         recommendedSolution: `Pitch a 1-page high-converting WhatsApp Booking Microsite + Google Maps profile boost. Easy $300-$500 setup with zero maintenance friction.`,
-        defaultHook: `Hey ${ownerName ? ownerName : biz}! Noticed you have great reviews on Google Maps, but don't have a website or booking page linked. Most local clients searching on their phones end up booking competitors with 1-tap WhatsApp booking. We built a fast 1-page WhatsApp booking site for ${cat} that fixes this. Can I share a 30-sec preview?`
+        defaultHook: `Hey ${ownerName ? ownerName : biz}! Noticed you have great reviews on Google Maps, but don't have a website or booking page linked. Most local clients searching on their phones end up booking competitors with 1-tap WhatsApp booking. We built a fast 1-page WhatsApp booking site ${nicheTarget} that fixes this. Can I share a 30-sec preview?`
       }
     } else if (lead.site_state === 'broken') {
       return {
@@ -98,7 +101,7 @@ export default function LeadDetailPanel({
         textColor: 'text-emerald-950 dark:text-emerald-100',
         whyPitch: `They have an active website, but it lacks direct 1-tap WhatsApp chat/appointment integration. Over 70% of local smartphone visitors refuse to fill out slow static contact forms and bounce without converting into an enquiry.`,
         recommendedSolution: `Add an automated 1-Click WhatsApp Booking Funnel & Speed optimization to double their enquiry conversion rate without increasing ad spend.`,
-        defaultHook: `Hey ${ownerName ? ownerName : biz}! Impressed by your Google Maps presence! Checked out ${lead.website_url}—clean site, but noticed it lacks a 1-tap WhatsApp booking flow for mobile visitors. Most smartphone clients bounce if they can't message instantly. We built an automated WhatsApp booking engine for ${cat} that 2x's enquiries. Open to a 30-sec demo?`
+        defaultHook: `Hey ${ownerName ? ownerName : biz}! Impressed by your Google Maps presence! Checked out ${lead.website_url}—clean site, but noticed it lacks a 1-tap WhatsApp booking flow for mobile visitors. Most smartphone clients bounce if they can't message instantly. We built an automated WhatsApp booking engine ${nicheTarget} that 2x's enquiries. Open to a 30-sec demo?`
       }
     }
   }
@@ -226,18 +229,18 @@ export default function LeadDetailPanel({
   const score = lead.score ?? 78
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-8 animate-fade-in overflow-y-auto" role="dialog" aria-modal="true">
-      {/* High-Focus Dark Backdrop (Background completely dimmed and isolated) */}
+    <div className="fixed inset-0 z-50 flex justify-center items-start sm:items-center p-2 sm:p-4 md:p-6 animate-fade-in overflow-y-auto" role="dialog" aria-modal="true">
+      {/* High-Focus Dark Backdrop */}
       <div
         className="fixed inset-0 bg-black/80 dark:bg-black/90 backdrop-blur-md transition-opacity cursor-pointer"
         onClick={onClose}
       />
 
-      {/* Large Centered Modal Box (Spacious, Beautiful, No Sharp Cuts, Never Cut Off) */}
-      <div className="relative w-full max-w-4xl max-h-[92vh] bg-white dark:bg-[#161B22] rounded-3xl shadow-2xl border border-slate-200 dark:border-stone-800 flex flex-col overflow-hidden z-10">
+      {/* Large Centered Modal Box (Spacious, Beautiful, Never Cut Off) */}
+      <div className="relative w-full max-w-4xl max-h-[94vh] sm:max-h-[90vh] bg-white dark:bg-[#161B22] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-stone-800 flex flex-col overflow-hidden z-10 my-auto">
         
-        {/* Modal Header */}
-        <div className="p-5 md:p-7 border-b border-slate-200 dark:border-stone-800 bg-slate-50/90 dark:bg-[#1C2128] flex items-start justify-between gap-4">
+        {/* Modal Header (Fixed at top of modal, shrink-0) */}
+        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-stone-800 bg-slate-50/90 dark:bg-[#1C2128] flex items-start justify-between gap-3 sm:gap-4 shrink-0">
           <div className="flex-1 min-w-0">
             {/* Badges Pill Row */}
             <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -341,11 +344,11 @@ export default function LeadDetailPanel({
         </div>
 
         {/* Action Outreach Bar */}
-        <div className="p-4 border-b border-slate-200 dark:border-stone-800 flex flex-wrap items-center gap-2.5 bg-white dark:bg-[#161B22]">
+        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-stone-800 flex flex-wrap items-center gap-2 sm:gap-2.5 bg-white dark:bg-[#161B22] shrink-0">
           <button
             onClick={handleSendClick}
             disabled={isSending || lead.status === 'won'}
-            className="btn btn-primary py-2.5 px-5 text-xs font-bold gap-2 rounded-xl shadow-md shadow-indigo-500/25 disabled:opacity-50 cursor-pointer"
+            className="btn btn-primary py-2.5 px-4 sm:px-5 text-xs font-bold gap-2 rounded-xl shadow-md shadow-indigo-500/25 disabled:opacity-50 cursor-pointer"
           >
             {isSending ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -358,7 +361,7 @@ export default function LeadDetailPanel({
           <button
             onClick={handleOpenWhatsAppWeb}
             title="Open in WhatsApp Web"
-            className="btn bg-[#25D366] hover:bg-[#1ea952] text-white py-2.5 px-4 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
+            className="btn bg-[#25D366] hover:bg-[#1ea952] text-white py-2.5 px-3.5 sm:px-4 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
           >
             <MessageSquare size={15} />
             Open in WA Web
@@ -367,7 +370,7 @@ export default function LeadDetailPanel({
           <button
             onClick={handleRunAudit}
             disabled={isAuditing}
-            className="btn btn-secondary py-2.5 px-4 text-xs font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-50 cursor-pointer text-indigo-700 dark:text-indigo-300"
+            className="btn btn-secondary py-2.5 px-3.5 sm:px-4 text-xs font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-50 cursor-pointer text-indigo-700 dark:text-indigo-300"
           >
             <Sparkles size={15} className={isAuditing ? 'animate-spin text-purple-600' : 'text-indigo-600'} />
             {isAuditing ? 'Auditing Web Flaws...' : (audit ? 'Re-Audit AI' : 'Run Live AI Audit')}
@@ -376,7 +379,7 @@ export default function LeadDetailPanel({
           {lead.status !== 'won' && (
             <button
               onClick={() => onUpdateStatus(lead.id, 'won')}
-              className="btn btn-secondary px-4 py-2.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 rounded-xl cursor-pointer"
+              className="btn btn-secondary px-3.5 sm:px-4 py-2.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 rounded-xl cursor-pointer"
             >
               <PartyPopper size={15} className="mr-1 text-emerald-600" />
               Mark as Won Client
@@ -398,59 +401,59 @@ export default function LeadDetailPanel({
 
         {/* Audit Status Bar if running */}
         {isAuditing && (
-          <div className="px-6 py-2.5 bg-indigo-50 dark:bg-indigo-950/60 border-b border-indigo-200 text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2 animate-fade-in">
+          <div className="px-6 py-2.5 bg-indigo-50 dark:bg-indigo-950/60 border-b border-indigo-200 text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2 animate-fade-in shrink-0">
             <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin shrink-0" />
             <span>{auditStep}</span>
           </div>
         )}
 
-        {/* Navigation Tabs (Clear, Bold, Crisp) */}
-        <div className="flex px-6 pt-3 border-b border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-[#1C2128] gap-2">
+        {/* Navigation Tabs (Clear, Bold, Crisp, Responsive) */}
+        <div className="flex px-4 sm:px-6 pt-2 sm:pt-3 border-b border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-[#1C2128] gap-1 sm:gap-2 shrink-0 overflow-x-auto">
           <button
             onClick={() => setActiveTab('strategy')}
-            className={`pb-3 px-4 text-xs font-black rounded-t-xl transition-all cursor-pointer ${
+            className={`pb-3 px-3 sm:px-4 text-xs font-black rounded-t-xl transition-all cursor-pointer shrink-0 ${
               activeTab === 'strategy'
                 ? 'text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 bg-white dark:bg-[#161B22]'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <HelpCircle size={15} />
+            <span className="flex items-center gap-1.5 sm:gap-2">
+              <HelpCircle size={14} />
               1. Why Pitch This Business? (Strategy)
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('audit')}
-            className={`pb-3 px-4 text-xs font-black rounded-t-xl transition-all cursor-pointer ${
+            className={`pb-3 px-3 sm:px-4 text-xs font-black rounded-t-xl transition-all cursor-pointer shrink-0 ${
               activeTab === 'audit'
                 ? 'text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 bg-white dark:bg-[#161B22]'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <Sparkles size={15} />
+            <span className="flex items-center gap-1.5 sm:gap-2">
+              <Sparkles size={14} />
               2. Website Flaws & Bottlenecks
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('overview')}
-            className={`pb-3 px-4 text-xs font-black rounded-t-xl transition-all cursor-pointer ${
+            className={`pb-3 px-3 sm:px-4 text-xs font-black rounded-t-xl transition-all cursor-pointer shrink-0 ${
               activeTab === 'overview'
                 ? 'text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 bg-white dark:bg-[#161B22]'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <FileText size={15} />
+            <span className="flex items-center gap-1.5 sm:gap-2">
+              <FileText size={14} />
               3. Owner Name & Full Dossier
             </span>
           </button>
         </div>
 
         {/* Tab Content Area (Scrollable, High Contrast, NEVER Cut Off) */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-white dark:bg-[#161B22] space-y-6 max-h-[calc(92vh-220px)]">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 md:p-8 bg-white dark:bg-[#161B22] space-y-5 sm:space-y-6">
 
           {/* TAB 1: WHY PITCH THIS BUSINESS (Deep Strategy Breakdown) */}
           {activeTab === 'strategy' && (
