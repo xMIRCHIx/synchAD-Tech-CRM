@@ -26,71 +26,68 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
+    // Prepare template name (hello_world is blocked by Meta on production numbers, use no_website_pitch)
+    const effectiveTemplate = (!templateName || templateName === 'hello_world')
+      ? 'no_website_pitch'
+      : templateName
+
     // Determine template language & dynamic parameters for all 4 approved Meta pitch templates
-    let effectiveLang = languageCode
+    let effectiveLang = 'en'
     let templateComponents: any[] | undefined = undefined
 
-    const isPitchTemplate = [
-      'no_website_pitch',
-      'broken_website_pitch',
-      'website_upgrade_pitch',
-      'social_to_web_pitch'
-    ].includes(templateName)
+    let params = templateParams
+    if (!params || !params.length) {
+      if (leadId) {
+        const supabase = createAdminClient()
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('*, website_audits(*)')
+          .eq('id', leadId)
+          .single()
 
-    if (isPitchTemplate) {
-      effectiveLang = 'en'
-      let params = templateParams
-      if (!params || !params.length) {
-        if (leadId) {
-          const supabase = createAdminClient()
-          const { data: lead } = await supabase
-            .from('leads')
-            .select('*, website_audits(*)')
-            .eq('id', leadId)
-            .single()
+        if (lead) {
+          const name = lead.owner_name || lead.business_name || 'there'
+          const bName = lead.business_name || 'your business'
+          const rating = lead.google_rating ? String(lead.google_rating) : '5.0'
+          const city = lead.address ? lead.address.split(',')[0].trim() : 'your city'
+          const flaw =
+            lead.website_audits?.[0]?.findings?.flaws?.[0] ||
+            lead.website_audits?.findings?.flaws?.[0] ||
+            'missing a 1-tap WhatsApp booking portal'
 
-          if (lead) {
-            const name = lead.owner_name || lead.business_name || 'there'
-            const bName = lead.business_name || 'your business'
-            const rating = lead.google_rating ? String(lead.google_rating) : '5.0'
-            const city = lead.address ? lead.address.split(',')[0].trim() : 'your city'
-            const flaw =
-              lead.website_audits?.[0]?.findings?.flaws?.[0] ||
-              lead.website_audits?.findings?.flaws?.[0] ||
-              'missing a 1-tap WhatsApp booking portal'
-
-            if (templateName === 'website_upgrade_pitch') {
-              params = [name, bName, rating, flaw]
-            } else if (templateName === 'social_to_web_pitch') {
-              params = [name, rating, bName, city]
-            } else {
-              params = [name, bName, rating, city]
-            }
+          if (effectiveTemplate === 'website_upgrade_pitch') {
+            params = [name, bName, rating, flaw]
+          } else if (effectiveTemplate === 'social_to_web_pitch') {
+            params = [name, rating, bName, city]
+          } else {
+            params = [name, bName, rating, city]
           }
         }
       }
-
-      if (!params || params.length < 4) {
-        if (templateName === 'website_upgrade_pitch') {
-          params = ['there', 'your business', '5.0', 'missing mobile booking portal']
-        } else if (templateName === 'social_to_web_pitch') {
-          params = ['there', '5.0', 'your business', 'your city']
-        } else {
-          params = ['there', 'your business', '5.0', 'your city']
-        }
-      }
-
-      templateComponents = [
-        {
-          type: 'body',
-          parameters: params.map((p: string) => ({ type: 'text', text: String(p) }))
-        }
-      ]
     }
 
+    if (!params || params.length < 4) {
+      if (effectiveTemplate === 'website_upgrade_pitch') {
+        params = ['there', 'your business', '5.0', 'missing mobile booking portal']
+      } else if (effectiveTemplate === 'social_to_web_pitch') {
+        params = ['there', '5.0', 'your business', 'your city']
+      } else {
+        params = ['there', 'your business', '5.0', 'your city']
+      }
+    }
+
+    templateComponents = [
+      {
+        type: 'body',
+        parameters: params.map((p: string) => ({ type: 'text', text: String(p) }))
+      }
+    ]
+
     // Prepare Meta Cloud API Payload:
+    // Only send plain text if useTextOnly is true (i.e. inside active 24h conversation).
+    // Otherwise, for first contact / re-engagement, ALWAYS send approved template directly.
     const messageBody = pitchText || 'Hello from Synchad!'
-    const tryTextFirst = Boolean(pitchText || useTextOnly)
+    const tryTextFirst = Boolean(useTextOnly)
 
     let payload: Record<string, any> = tryTextFirst
       ? {
@@ -109,11 +106,11 @@ export async function POST(req: Request) {
           to: cleanPhone,
           type: 'template',
           template: {
-            name: templateName,
+            name: effectiveTemplate,
             language: {
               code: effectiveLang,
             },
-            ...(templateComponents ? { components: templateComponents } : {})
+            components: templateComponents,
           },
         }
 
@@ -132,18 +129,18 @@ export async function POST(req: Request) {
 
     // If text failed because outside 24h window (error code 131047), fallback to template
     if (!metaRes.ok && metaData.error?.code === 131047 && payload.type === 'text') {
-      console.log(`[Meta WhatsApp] Outside 24h window. Falling back to template: ${templateName}`)
+      console.log(`[Meta WhatsApp] Outside 24h window. Falling back to template: ${effectiveTemplate}`)
       payload = {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: cleanPhone,
         type: 'template',
         template: {
-          name: templateName,
+          name: effectiveTemplate,
           language: {
             code: effectiveLang,
           },
-          ...(templateComponents ? { components: templateComponents } : {})
+          components: templateComponents,
         },
       }
       metaRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {

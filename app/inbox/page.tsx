@@ -45,7 +45,7 @@ export default function InboxPage() {
   const [isSending, setIsSending] = useState(false)
   const [copiedPhone, setCopiedPhone] = useState(false)
   const [copiedPitch, setCopiedPitch] = useState(false)
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('hello_world')
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('no_website_pitch')
   const [deleteMenuOpen, setDeleteMenuOpen] = useState(false)
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; action: 'clear_chat' | 'delete_lead' | null }>({
     open: false,
@@ -237,6 +237,8 @@ export default function InboxPage() {
       const waData = await waRes.json()
 
       if (!waRes.ok || !waData.success) {
+        // Rollback optimistic message so it doesn't falsely display as delivered
+        setActiveMessages((prev) => prev.filter((m) => m.id !== tempId))
         setToast({
           id: Date.now().toString(),
           title: 'Meta WhatsApp Delivery Notice',
@@ -259,6 +261,7 @@ export default function InboxPage() {
       }
     } catch (err: any) {
       console.error(err)
+      setActiveMessages((prev) => prev.filter((m) => m.id !== tempId))
       setToast({
         id: Date.now().toString(),
         title: 'Error Sending',
