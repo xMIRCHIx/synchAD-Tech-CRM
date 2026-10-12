@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useState, use } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Target, Users, Play, Pause, Zap, Edit3, Trash2,
   CheckCircle2, Globe, ExternalLink, RefreshCw, Send, MapPin, Sparkles, TrendingUp, Eye, ArrowRight, Phone, Check,
@@ -27,6 +27,9 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
   const resolvedParams = use(params)
   const campaignId = resolvedParams.id
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const shouldBgScrape = searchParams?.get('bgScrape') === 'true'
+  const hasTriggeredBgScrape = React.useRef(false)
 
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
@@ -65,8 +68,28 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
     fetchCampaignAndLeads()
   }, [campaignId])
 
-  async function fetchCampaignAndLeads() {
-    setLoading(true)
+  // Trigger background scrape if navigated from campaign creation wizard
+  useEffect(() => {
+    if (shouldBgScrape && campaign && !hasTriggeredBgScrape.current) {
+      hasTriggeredBgScrape.current = true
+      handleScrapeMore()
+    }
+  }, [shouldBgScrape, campaign])
+
+  // Poll leads periodically while scraping is active so user sees live lead collection
+  useEffect(() => {
+    if (!campaign) return
+    const maxLeads = campaign.max_leads || 10
+    if (isScraping && leads.length < maxLeads) {
+      const interval = setInterval(() => {
+        fetchCampaignAndLeads(true)
+      }, 3500)
+      return () => clearInterval(interval)
+    }
+  }, [isScraping, leads.length, campaign])
+
+  async function fetchCampaignAndLeads(silent = false) {
+    if (!silent) setLoading(true)
     try {
       // 1. Fetch campaigns
       const cRes = await fetch('/api/campaigns')
@@ -96,7 +119,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
     } catch (err: any) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -440,6 +463,32 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
             })()}
           </div>
         </div>
+
+        {/* Background Lead Harvesting Status Banner */}
+        {isScraping && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border-2 border-indigo-200 dark:border-indigo-800 flex flex-wrap items-center justify-between gap-4 animate-fade-in shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="w-5 h-5 border-2 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+              <div>
+                <div className="text-sm font-bold text-indigo-950 dark:text-indigo-100 flex items-center gap-2">
+                  <span>⚡ Background Lead Harvester Active</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-200 dark:bg-indigo-800 text-indigo-900 dark:text-indigo-200 font-extrabold">
+                    {leads.length} / {campaign?.max_leads || 10} Leads Collected
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-0.5 font-medium">
+                  Apify Google Maps crawler is actively harvesting and verifying local leads in the background. Leads appear live below!
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => fetchCampaignAndLeads(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-stone-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 text-xs font-bold hover:bg-indigo-50 cursor-pointer flex items-center gap-1.5 shrink-0"
+            >
+              <RefreshCw size={13} className="animate-spin" /> Live Sync
+            </button>
+          </div>
+        )}
 
         {/* KPI Cards for This Campaign (Clickable to Filter Table) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

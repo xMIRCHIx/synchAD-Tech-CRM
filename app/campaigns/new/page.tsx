@@ -112,7 +112,8 @@ export default function NewCampaignPage() {
   const [stepStatus, setStepStatus] = useState<string>('')
 
   // Form State
-  const [name, setName] = useState('')
+  const [name, setName] = useState('Dental Clinics in Delhi - Blitz')
+  const [isCustomName, setIsCustomName] = useState(false)
   const [selectedNiche, setSelectedNiche] = useState('Dental Clinics')
   const [nicheSearch, setNicheSearch] = useState('')
   const [customNiche, setCustomNiche] = useState('')
@@ -166,7 +167,9 @@ export default function NewCampaignPage() {
     const found = NICHE_DIRECTORY.find(n => n.name === nicheName)
     const effectiveQuery = queryStr || found?.query || nicheName.toLowerCase()
     setSearchQuery(effectiveQuery)
-    setName(`${nicheName} in ${location.split(',')[0]} - Blitz`)
+    if (!isCustomName) {
+      setName(`${nicheName} in ${location.split(',')[0]} - Blitz`)
+    }
   }
 
   // Smart AI Niche Expansion Handler
@@ -197,7 +200,11 @@ export default function NewCampaignPage() {
         // Natural Google Maps search keywords
         setSearchQuery(`${val.trim()} service near me`)
       }
-      setName(`${val} in ${location.split(',')[0]} - Blitz`)
+
+      // ONLY auto-update name if user hasn't explicitly typed a custom campaign name!
+      if (!isCustomName) {
+        setName(`${val.trim()} in ${location.split(',')[0]} - Blitz`)
+      }
     }
   }
 
@@ -205,14 +212,18 @@ export default function NewCampaignPage() {
   const handleSelectLocation = (locVal: string) => {
     setLocation(locVal)
     const locPrefix = locVal === 'India' ? 'Pan-India' : locVal.split(',')[0]
-    setName(`${selectedNiche || 'Outreach'} in ${locPrefix} - Blitz`)
+    if (!isCustomName) {
+      setName(`${selectedNiche || 'Outreach'} in ${locPrefix} - Blitz`)
+    }
   }
 
   // Generate Smart Name
   const handleAutoName = () => {
     const locPrefix = location === 'India' ? 'Pan-India' : location.split(',')[0].trim()
     const month = new Date().toLocaleString('en-US', { month: 'short' })
-    setName(`${selectedNiche || 'Prospects'} • ${locPrefix} [${month}]`)
+    const suggested = `${selectedNiche || 'Prospects'} • ${locPrefix} [${month}]`
+    setName(suggested)
+    setIsCustomName(true)
   }
 
   // Handle Form Submission
@@ -229,13 +240,10 @@ export default function NewCampaignPage() {
     }
 
     setIsSubmitting(true)
-    setStepStatus('Initializing Apify Google Maps Scraper...')
+    setStepStatus('Creating campaign in database...')
 
     try {
-      if (executionMode === 'instant') {
-        setStepStatus(`Scraping Google Maps in ${location} via Apify...`)
-      }
-
+      // 1. Create campaign instantly (instantScrape: false so user NEVER hangs on 60s loader)
       const res = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -245,7 +253,7 @@ export default function NewCampaignPage() {
           location: location.trim(),
           niche: customNiche.trim() || selectedNiche,
           maxLeads: Number(maxLeads),
-          instantScrape: executionMode === 'instant',
+          instantScrape: false, // Background collection: User is not blocked!
           autoEnrich,
           requirePhone,
           requireWebsite,
@@ -261,20 +269,27 @@ export default function NewCampaignPage() {
         throw new Error(data.error || 'Failed to create campaign')
       }
 
-      setStepStatus('Done! Saving verified leads to CRM...')
+      setStepStatus('Campaign launched! Redirecting to workspace...')
 
       setToast({
         id: Date.now().toString(),
-        title: 'Campaign Created Successfully!',
+        title: 'Campaign Launched!',
         description: executionMode === 'instant'
-          ? `Scraped and saved ${data.leadsCreated || 0} leads directly to your Leads Pipeline.`
-          : 'Campaign scheduled for staggered delivery.',
+          ? 'Collecting verified leads in the background...'
+          : 'Campaign scheduled successfully.',
         type: 'success'
       })
 
+      const campaignId = data.campaign?.id
+      const queryParam = executionMode === 'instant' ? '?bgScrape=true' : ''
+
       setTimeout(() => {
-        router.push(`/campaigns/${data.campaign?.id || ''}`)
-      }, 1200)
+        if (campaignId) {
+          router.push(`/campaigns/${campaignId}${queryParam}`)
+        } else {
+          router.push('/campaigns')
+        }
+      }, 400)
 
     } catch (err: any) {
       console.error(err)
@@ -284,7 +299,6 @@ export default function NewCampaignPage() {
         description: err.message,
         type: 'error'
       })
-    } finally {
       setIsSubmitting(false)
       setStepStatus('')
     }
@@ -362,7 +376,10 @@ export default function NewCampaignPage() {
                 type="text"
                 placeholder="e.g. Libraries in Delhi - Oct Blitz"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={e => {
+                  setName(e.target.value)
+                  setIsCustomName(true)
+                }}
                 className="w-full px-3.5 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
