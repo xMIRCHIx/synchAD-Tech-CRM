@@ -156,12 +156,17 @@ export interface ClientInvoice {
   client_phone: string
   client_address?: string
   amount: number
+  total_amount?: number
+  tax_percent?: number
+  discount?: number
   status: 'draft' | 'unpaid' | 'paid' | 'overdue'
   installment_label: string
   issue_date: string
   due_date: string
   items: Array<{
+    id?: string
     description: string
+    details?: string
     quantity: number
     rate: number
     amount: number

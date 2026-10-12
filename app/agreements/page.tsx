@@ -136,6 +136,7 @@ Please review and confirm acceptance. Thank you!`
       {/* Agreement Modal */}
       <AgreementModal
         isOpen={isAgreementModalOpen}
+        initialAgreement={activeAgreement}
         onClose={() => {
           setIsAgreementModalOpen(false)
           setActiveAgreement(null)
@@ -376,6 +377,17 @@ Please review and confirm acceptance. Thank you!`
                       {/* Actions */}
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              setActiveAgreement(agr)
+                              setIsAgreementModalOpen(true)
+                            }}
+                            className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 flex items-center justify-center hover:bg-purple-100 cursor-pointer"
+                            title="View / Print Agreement"
+                          >
+                            <Printer size={13} />
+                          </button>
+
                           {agr.client_phone && (
                             <button
                               onClick={() => handleSendWhatsApp(agr)}

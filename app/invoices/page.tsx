@@ -138,6 +138,7 @@ Please let us know once the payment is completed. Thank you!`
       {/* Invoice Generator Modal */}
       <InvoiceModal
         isOpen={isInvoiceModalOpen}
+        initialInvoice={activeInvoice}
         onClose={() => {
           setIsInvoiceModalOpen(false)
           setActiveInvoice(null)
@@ -381,6 +382,17 @@ Please let us know once the payment is completed. Thank you!`
                       {/* Actions */}
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              setActiveInvoice(inv)
+                              setIsInvoiceModalOpen(true)
+                            }}
+                            className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 flex items-center justify-center hover:bg-purple-100 cursor-pointer"
+                            title="View / Print Invoice"
+                          >
+                            <Printer size={13} />
+                          </button>
+
                           <button
                             onClick={() => handleSendWhatsApp(inv)}
                             className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-emerald-100 cursor-pointer"

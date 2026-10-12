@@ -10,6 +10,7 @@ import { useData } from '@/context/DataContext'
 
 interface AgreementModalProps {
   lead?: Lead | null
+  initialAgreement?: ClientAgreement | null
   isOpen: boolean
   onClose: () => void
   dealData?: {
@@ -40,6 +41,7 @@ const DEFAULT_AGENCY: AgencyProfile = {
 
 export default function AgreementModal({
   lead,
+  initialAgreement,
   isOpen,
   onClose,
   dealData,
@@ -68,11 +70,12 @@ export default function AgreementModal({
   const [isGenerating, setIsGenerating] = useState(false)
   const [agreementText, setAgreementText] = useState('')
   const [agreementNumber, setAgreementNumber] = useState('')
+  const [effectiveDate, setEffectiveDate] = useState('13 Oct 2026')
   const [isEditing, setIsEditing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
 
-  // Load Agency Profile from LocalStorage
+  // Load Agency Profile from LocalStorage & set effective date
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedProfile = localStorage.getItem('synchad_agency_profile')
@@ -82,12 +85,22 @@ export default function AgreementModal({
           setAgency(prev => ({ ...prev, ...parsed }))
         } catch {}
       }
+      setEffectiveDate(new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }))
     }
   }, [isOpen])
 
-  // Sync client details from lead prop or selected lead
+  // Sync client details from initialAgreement, lead prop, or selected lead
   useEffect(() => {
-    if (lead) {
+    if (initialAgreement) {
+      setAgreementNumber(initialAgreement.agreement_number)
+      setAgreementText(initialAgreement.content || '')
+      setBusinessName(initialAgreement.client_signatory || '')
+      setClientName(initialAgreement.client_signatory || '')
+      setClientPhone(initialAgreement.client_phone || '')
+      setDealVal(initialAgreement.deal_value || 0)
+      setService(initialAgreement.title || 'Custom Website Development Agreement')
+      if (initialAgreement.effective_date) setEffectiveDate(initialAgreement.effective_date)
+    } else if (lead) {
       setBusinessName(lead.business_name || '')
       setClientName(lead.owner_name || lead.business_name || '')
       setClientPhone(lead.phone || '')
@@ -103,11 +116,14 @@ export default function AgreementModal({
         setClientAddress(found.address || '')
       }
     }
-  }, [lead, selectedLeadId, leads])
+  }, [initialAgreement, lead, selectedLeadId, leads])
 
   useEffect(() => {
     if (isOpen) {
-      if (!agreementText) {
+      if (initialAgreement) {
+        setAgreementText(initialAgreement.content || '')
+        setAgreementNumber(initialAgreement.agreement_number)
+      } else if (!agreementText) {
         handleGenerateAgreement()
       }
     } else {
@@ -116,7 +132,7 @@ export default function AgreementModal({
       setIsEditing(false)
       setIsSaved(false)
     }
-  }, [isOpen])
+  }, [isOpen, initialAgreement])
 
   if (!isOpen) return null
 
@@ -405,7 +421,7 @@ Please confirm acceptance so we can commence development immediately!`
                   #{agreementNumber}
                 </span>
                 <span className="text-[11px] text-slate-500 block mt-0.5">
-                  Effective Date: {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  Effective Date: {effectiveDate}
                 </span>
               </div>
             </div>

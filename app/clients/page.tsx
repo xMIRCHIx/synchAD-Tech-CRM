@@ -17,7 +17,7 @@ import { useData } from '@/context/DataContext'
 
 export default function ClientsDashboard() {
   const { leads, initialLoading, isRefreshing, refreshAll, updateLeadStatus } = useData()
-  const clients = leads.filter((l) => l.status === 'won')
+  const clients = React.useMemo(() => leads.filter((l) => l.status === 'won'), [leads])
   const loading = initialLoading && leads.length === 0
 
   const [search, setSearch] = useState('')
@@ -28,23 +28,23 @@ export default function ClientsDashboard() {
   const [dealModalClient, setDealModalClient] = useState<Lead | null>(null)
   const [agreementModalClient, setAgreementModalClient] = useState<Lead | null>(null)
   const [invoiceModalClient, setInvoiceModalClient] = useState<Lead | null>(null)
-  const [dealsMap, setDealsMap] = useState<Record<string, ClientDeal>>({})
+  const [localDeals, setLocalDeals] = useState<Record<string, ClientDeal>>({})
 
-  useEffect(() => {
-    // Parse any existing deals stored in notes or state
-    const map: Record<string, ClientDeal> = {}
+  // Derive dealsMap cleanly without infinite re-render loop
+  const dealsMap = React.useMemo(() => {
+    const map: Record<string, ClientDeal> = { ...localDeals }
     for (const c of clients) {
       if (c.notes) {
         try {
           const parsed = JSON.parse(c.notes)
-          if (parsed?.__deal) {
+          if (parsed?.__deal && !map[c.id]) {
             map[c.id] = parsed.__deal
           }
         } catch {}
       }
     }
-    setDealsMap(prev => ({ ...prev, ...map }))
-  }, [clients])
+    return map
+  }, [clients, localDeals])
 
   async function handleUpdateStatus(id: string, newStatus: LeadStatus) {
     try {
@@ -59,7 +59,7 @@ export default function ClientsDashboard() {
   }
 
   function handleDealSaved(deal: ClientDeal) {
-    setDealsMap(prev => ({ ...prev, [deal.lead_id]: deal }))
+    setLocalDeals(prev => ({ ...prev, [deal.lead_id]: deal }))
     refreshAll(true)
     setToast({
       id: String(Date.now()),
