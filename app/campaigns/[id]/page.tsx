@@ -23,6 +23,29 @@ function parseNiche(rawNiche?: string | null) {
   return { cleanNiche, websiteTypes: types }
 }
 
+function getStatusBadgeStyle(status: LeadStatus) {
+  switch (status) {
+    case 'won':
+      return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700'
+    case 'replied':
+      return 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-950/80 dark:text-cyan-300 dark:border-cyan-700'
+    case 'sent':
+    case 'delivered':
+      return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700'
+    case 'queued':
+      return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/80 dark:text-purple-300 dark:border-purple-700'
+    case 'review':
+    case 'new':
+      return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-700'
+    case 'lost':
+    case 'skipped':
+      return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-700'
+    default:
+      return 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700'
+  }
+}
+
+
 function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const campaignId = resolvedParams.id
@@ -258,22 +281,39 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
   }
 
   async function handleUpdateStatus(id: string, newStatus: LeadStatus) {
+    const previousLeads = leads
+    // Optimistic update
+    setLeads((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l))
+    )
+    if (selectedLead?.id === id) {
+      setSelectedLead((prev) => (prev ? { ...prev, status: newStatus } : null))
+    }
+
     try {
       const res = await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: newStatus }),
       })
-      if (res.ok) {
-        setLeads((prev) =>
-          prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l))
-        )
-        if (selectedLead?.id === id) {
-          setSelectedLead((prev) => (prev ? { ...prev, status: newStatus } : null))
-        }
+      if (!res.ok) {
+        throw new Error('Failed to update lead status in database')
       }
-    } catch (err) {
+      setToast({
+        id: Date.now().toString(),
+        title: 'Status Updated',
+        description: `Lead status updated to ${newStatus.toUpperCase()}`,
+        type: 'success',
+      })
+    } catch (err: any) {
       console.error(err)
+      setLeads(previousLeads)
+      setToast({
+        id: Date.now().toString(),
+        title: 'Update Failed',
+        description: err.message || 'Could not update status',
+        type: 'error',
+      })
     }
   }
 
@@ -851,11 +891,32 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
                           </span>
                         </td>
 
-                        {/* Status */}
-                        <td>
-                          <span className="badge badge-primary uppercase text-[10px] font-black">
-                            {lead.status}
-                          </span>
+                        {/* Status Interactive Selector */}
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div className="relative inline-flex items-center">
+                            <select
+                              value={lead.status}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleUpdateStatus(lead.id, e.target.value as LeadStatus)
+                              }}
+                              className={`text-[10px] font-black uppercase pl-2.5 pr-6 py-1 rounded-lg border outline-none cursor-pointer appearance-none shadow-2xs transition-all ${getStatusBadgeStyle(lead.status)}`}
+                              title="Click to change lead status directly"
+                            >
+                              <option value="review" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Review</option>
+                              <option value="new" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">New</option>
+                              <option value="queued" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Queued</option>
+                              <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Pitched / Sent</option>
+                              <option value="delivered" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Delivered</option>
+                              <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Replied</option>
+                              <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Won 🏆</option>
+                              <option value="lost" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Lost</option>
+                              <option value="skipped" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Skipped</option>
+                            </select>
+                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[8px] opacity-60">
+                              ▼
+                            </span>
+                          </div>
                         </td>
 
                         {/* Actions */}
