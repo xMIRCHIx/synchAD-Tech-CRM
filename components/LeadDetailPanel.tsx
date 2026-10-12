@@ -34,6 +34,8 @@ export default function LeadDetailPanel({
   const [auditStep, setAuditStep] = useState('')
   const [customPitch, setCustomPitch] = useState<string | null>(null)
   const [isEditingPitch, setIsEditingPitch] = useState(false)
+  const [isRegeneratingPitch, setIsRegeneratingPitch] = useState(false)
+  const [regenStatus, setRegenStatus] = useState<string | null>(null)
 
   // Owner Name State
   const [ownerName, setOwnerName] = useState('')
@@ -46,6 +48,7 @@ export default function LeadDetailPanel({
       setCustomPitch(null)
       setIsEditingPitch(false)
       setIsEditingOwner(false)
+      setRegenStatus(null)
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'unset'
@@ -62,24 +65,47 @@ export default function LeadDetailPanel({
   const flaws = Array.isArray(findings.flaws) ? findings.flaws : []
   const strengths = Array.isArray(findings.strengths) ? findings.strengths : []
 
+  const rawUrl = (lead.website_url || '').trim()
+  const hasRealWebsite = Boolean(
+    rawUrl &&
+    rawUrl.toLowerCase() !== 'null' &&
+    rawUrl.toLowerCase() !== 'undefined'
+  )
+  const isSocial = hasRealWebsite && /instagram\.com|facebook\.com|fb\.com|linkedin\.com/i.test(rawUrl)
+
   // Dynamic Strategy Reasoning depending on website existence (High Contrast Palettes)
   const getStrategicWhyPitch = () => {
-    const biz = lead.business_name
+    const rawBiz = lead.business_name || ''
+    const isDirectContact = rawBiz.toLowerCase().startsWith('direct contact')
+    const cleanBiz = isDirectContact ? '' : rawBiz
+    const recipientName = ownerName?.trim() || cleanBiz
+    const greeting = recipientName ? `Hey ${recipientName}!` : 'Hey there!'
+
     const rawCat = lead.campaigns?.niche
     const cat = rawCat && rawCat !== 'Local Business' ? rawCat : null
-    const searchTarget = cat ? `"${cat}"` : `businesses like "${biz}" or services nearby`
-    const nicheTarget = cat ? `for ${cat}` : 'for modern businesses'
+    const searchTarget = cat ? `"${cat}"` : `businesses like "${cleanBiz || 'yours'}" or services nearby`
 
-    if (lead.site_state === 'none') {
+    if (!hasRealWebsite || lead.site_state === 'none') {
       return {
         situation: 'NO WEBSITE DETECTED',
         angle: 'Direct Customer Leak to Online Rivals',
         badgeColor: 'bg-amber-100 dark:bg-amber-950/70 border-2 border-amber-300 dark:border-amber-600',
         tagBg: 'bg-amber-500 text-white font-black shadow-xs',
         textColor: 'text-amber-950 dark:text-amber-100',
-        whyPitch: `This business has an active Google Maps profile with positive customer reviews, but ZERO website or landing page. When local customers search for ${searchTarget}, they click competitor profiles who provide instant 1-tap WhatsApp booking and pricing menus.`,
-        recommendedSolution: `Pitch a 1-page high-converting WhatsApp Booking Microsite + Google Maps profile boost. Easy $300-$500 setup with zero maintenance friction.`,
-        defaultHook: `Hey ${ownerName ? ownerName : biz}! Noticed you have great reviews on Google Maps, but don't have a website or booking page linked. Most local clients searching on their phones end up booking competitors with 1-tap WhatsApp booking. We built a fast 1-page WhatsApp booking site ${nicheTarget} that fixes this. Can I share a 30-sec preview?`
+        whyPitch: `This business has an active Google Maps profile with customer reviews, but ZERO official website or digital portal. When local customers search for ${searchTarget}, they click competitor profiles who provide instant 1-tap WhatsApp booking and services.`,
+        recommendedSolution: `Pitch a modern high-converting website with 1-tap WhatsApp booking + Google Maps boost. Close via quick Zoom demo / call.`,
+        defaultHook: `${greeting} Impressed by your Google Maps presence and reviews! Noticed you don't have an official website or booking page linked yet, so many local clients end up choosing competitors who have 1-tap booking. We build modern, high-converting websites with instant WhatsApp booking for businesses. If you'd like, I can share a few of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
+      }
+    } else if (isSocial) {
+      return {
+        situation: 'SOCIAL MEDIA LINK ONLY',
+        angle: 'Social Page Lacks High-Converting Website Authority',
+        badgeColor: 'bg-indigo-100 dark:bg-indigo-950/70 border-2 border-indigo-300 dark:border-indigo-600',
+        tagBg: 'bg-indigo-600 text-white font-black shadow-xs',
+        textColor: 'text-indigo-950 dark:text-indigo-100',
+        whyPitch: `Their Google Maps profile links to a social media handle (${rawUrl}) instead of a dedicated business website, which limits customer conversion and Google ranking.`,
+        recommendedSolution: `Pitch a dedicated business website with direct WhatsApp integration and portfolio showcase.`,
+        defaultHook: `${greeting} Impressed by your Google Maps presence! Noticed your profile links to a social page (${rawUrl}) rather than a dedicated business website, which limits your Google search ranking and mobile bookings. We build dedicated websites with 1-tap WhatsApp booking engines. If you'd like, I can share some of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
       }
     } else if (lead.site_state === 'broken') {
       return {
@@ -88,9 +114,9 @@ export default function LeadDetailPanel({
         badgeColor: 'bg-rose-100 dark:bg-rose-950/70 border-2 border-rose-300 dark:border-rose-600',
         tagBg: 'bg-rose-500 text-white font-black shadow-xs',
         textColor: 'text-rose-950 dark:text-rose-100',
-        whyPitch: `Their registered website link is throwing errors (HTTP 4xx/5xx or SSL issue) or fails to load on mobile smartphones. Every customer clicking their profile from Google Maps lands on an error screen, instantly destroying credibility.`,
-        recommendedSolution: `Emergency Website Fix + Instant WhatsApp Booking integration. This is an urgent, high-converting pitch because they are actively leaking paying clients right now.`,
-        defaultHook: `Hey ${ownerName ? ownerName : biz}! Noticed your business on Google Maps, but when clicking your website link ${lead.website_url}, it seems down / unreachable on mobile. Local clients trying to reach you are getting bounced. We can fix this immediately with a fast mobile booking page. Mind if I send a quick preview?`
+        whyPitch: `Their registered website link (${rawUrl}) is throwing errors or failing to load on mobile phones. Prospective customers clicking their Google Maps profile land on an error screen, instantly destroying credibility.`,
+        recommendedSolution: `Emergency Website Fix + Instant WhatsApp Booking integration. High urgency pitch because they are actively leaking paying clients right now.`,
+        defaultHook: `${greeting} Wanted to give you a quick heads up — noticed your website link on Google Maps (${rawUrl}) is currently not loading / showing an error page. Local clients clicking your profile are bouncing off. We help businesses fix, revamp, and integrate fast WhatsApp booking. If interested, I can share some of our work samples. Would you be open for a quick 5-minute call or Zoom meeting to discuss fixing this?`
       }
     } else {
       return {
@@ -99,15 +125,30 @@ export default function LeadDetailPanel({
         badgeColor: 'bg-emerald-100 dark:bg-emerald-950/70 border-2 border-emerald-300 dark:border-emerald-600',
         tagBg: 'bg-emerald-600 text-white font-black shadow-xs',
         textColor: 'text-emerald-950 dark:text-emerald-100',
-        whyPitch: `They have an active website, but it lacks direct 1-tap WhatsApp chat/appointment integration. Over 70% of local smartphone visitors refuse to fill out slow static contact forms and bounce without converting into an enquiry.`,
+        whyPitch: `They have an active website, but it lacks direct 1-tap WhatsApp chat/appointment integration. Over 70% of local smartphone visitors refuse to fill out slow static contact forms and bounce without converting.`,
         recommendedSolution: `Add an automated 1-Click WhatsApp Booking Funnel & Speed optimization to double their enquiry conversion rate without increasing ad spend.`,
-        defaultHook: `Hey ${ownerName ? ownerName : biz}! Impressed by your Google Maps presence! Checked out ${lead.website_url}—clean site, but noticed it lacks a 1-tap WhatsApp booking flow for mobile visitors. Most smartphone clients bounce if they can't message instantly. We built an automated WhatsApp booking engine ${nicheTarget} that 2x's enquiries. Open to a 30-sec demo?`
+        defaultHook: `${greeting} Impressed by your Google Maps presence! Checked out ${rawUrl} — looks great, but noticed it lacks a 1-tap WhatsApp booking flow for mobile visitors. Most smartphone clients bounce if they can't message instantly. We help businesses optimize mobile conversion and automate client enquiries. If you'd like, I can share some of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
       }
     }
   }
 
   const strategy = getStrategicWhyPitch()
-  const currentPitch = customPitch ?? (audit?.ai_pitch || strategy.defaultHook)
+
+  // Sanitize stored database pitch if it contains 'null', claims pre-built site, or references non-existent site
+  const isStaleOrBuggyPitch = (text?: string | null) => {
+    if (!text) return true
+    const lower = text.toLowerCase()
+    if (lower.includes('null')) return true
+    if (lower.includes('we built a website for you') || lower.includes('we built a 1-page') || lower.includes('we built an automated whatsapp booking engine for modern businesses that 2x')) return true
+    if (!hasRealWebsite && (lower.includes('checked out') || lower.includes('your website link'))) return true
+    return false
+  }
+
+  const basePitch = (audit?.ai_pitch && !isStaleOrBuggyPitch(audit.ai_pitch))
+    ? audit.ai_pitch
+    : strategy.defaultHook
+
+  const currentPitch = customPitch ?? basePitch
 
   // Direct Google Maps Link
   const googleMapsUrl =
@@ -140,12 +181,69 @@ export default function LeadDetailPanel({
     }, 400)
   }
 
-  // Open native WhatsApp Web / App
+  // Open native WhatsApp Web / App directly with prefilled current pitch
   const handleOpenWhatsAppWeb = () => {
     const cleanPhone = lead.phone.replace(/[^\d]/g, '')
-    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(currentPitch)}`
+    const isDesktop = typeof window !== 'undefined' && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    const url = isDesktop
+      ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(currentPitch)}`
+      : `https://wa.me/${cleanPhone}?text=${encodeURIComponent(currentPitch)}`
     window.open(url, '_blank')
     onUpdateStatus(lead.id, 'sent')
+  }
+
+  // AI Regenerate Pitch with Gemini
+  const handleRegeneratePitch = async () => {
+    setIsRegeneratingPitch(true)
+    setRegenStatus('AI is crafting a fresh pitch...')
+    try {
+      const res = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          websiteUrl: hasRealWebsite ? lead.website_url : null,
+          businessName: lead.business_name,
+          category: lead.campaigns?.niche,
+          regeneratePitchOnly: true
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok && data.ai_pitch) {
+        setCustomPitch(data.ai_pitch)
+        if (onLeadEnriched) {
+          const prevAudit = lead.website_audits
+          const nowStr = new Date().toISOString()
+          onLeadEnriched({
+            ...lead,
+            website_audits: prevAudit
+              ? { ...prevAudit, ai_pitch: data.ai_pitch, updated_at: nowStr }
+              : {
+                  id: '',
+                  lead_id: lead.id,
+                  http_status: 200,
+                  scraped_text: null,
+                  findings: { flaws: [], strengths: [] },
+                  ai_pitch: data.ai_pitch,
+                  created_at: nowStr,
+                  updated_at: nowStr
+                }
+          })
+        }
+        setRegenStatus('✨ Fresh pitch ready!')
+        setTimeout(() => setRegenStatus(null), 2500)
+      } else {
+        setRegenStatus('Failed to generate. Try again.')
+        setTimeout(() => setRegenStatus(null), 3000)
+      }
+    } catch (err) {
+      console.error('Failed to regenerate pitch:', err)
+      setRegenStatus('Error regenerating pitch.')
+      setTimeout(() => setRegenStatus(null), 3000)
+    } finally {
+      setIsRegeneratingPitch(false)
+    }
   }
 
   // Save Owner / Director Name
@@ -488,21 +586,43 @@ export default function LeadDetailPanel({
 
               {/* Strategic WhatsApp Hook Box */}
               <div className="p-6 rounded-3xl bg-indigo-50/70 dark:bg-indigo-950/40 border-2 border-indigo-200 dark:border-indigo-800 space-y-3.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
                     <Sparkles size={16} />
                     <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider">
                       Ready-to-Send WhatsApp Outreach Message
                     </h3>
                   </div>
-                  <button
-                    onClick={handleCopyPitch}
-                    className="p-1.5 rounded-xl bg-white dark:bg-stone-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 flex items-center gap-1 text-xs font-bold cursor-pointer"
-                  >
-                    {copiedPitch ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                    <span>{copiedPitch ? 'Copied' : 'Copy Hook'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleRegeneratePitch}
+                      disabled={isRegeneratingPitch}
+                      className="p-1.5 px-3 rounded-xl bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 hover:bg-purple-200 border border-purple-300 dark:border-purple-800 flex items-center gap-1.5 text-xs font-bold cursor-pointer transition-all disabled:opacity-50"
+                      title="Regenerate a fresh personalized outreach pitch using AI"
+                    >
+                      <RefreshCw size={13} className={isRegeneratingPitch ? 'animate-spin' : ''} />
+                      <span>{isRegeneratingPitch ? 'Regenerating...' : 'AI Regenerate'}</span>
+                    </button>
+                    <button
+                      onClick={handleCopyPitch}
+                      className="p-1.5 px-3 rounded-xl bg-white dark:bg-stone-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 flex items-center gap-1 text-xs font-bold cursor-pointer"
+                    >
+                      {copiedPitch ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                      <span>{copiedPitch ? 'Copied' : 'Copy Hook'}</span>
+                    </button>
+                  </div>
                 </div>
+
+                {regenStatus && (
+                  <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-2 animate-fade-in">
+                    {isRegeneratingPitch ? (
+                      <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                    ) : (
+                      <CheckCircle2 size={14} className="text-purple-600 shrink-0" />
+                    )}
+                    <span>{regenStatus}</span>
+                  </div>
+                )}
 
                 {isEditingPitch ? (
                   <div className="space-y-2">

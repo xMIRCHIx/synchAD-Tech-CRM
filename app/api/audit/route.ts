@@ -6,7 +6,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 export async function POST(req: Request) {
   try {
-    const { leadId, websiteUrl, businessName, category } = await req.json()
+    const { leadId, websiteUrl, businessName, category, regeneratePitchOnly } = await req.json()
 
     if (!leadId && !websiteUrl) {
       return NextResponse.json({ error: 'leadId or websiteUrl is required' }, { status: 400 })
@@ -28,68 +28,80 @@ export async function POST(req: Request) {
       currentLead = lead
     }
 
-    const targetUrl = websiteUrl || currentLead?.website_url
-    const name = businessName || currentLead?.business_name || 'Business'
+    const rawUrl = (websiteUrl || currentLead?.website_url || '').trim()
+    const targetUrl = (rawUrl && rawUrl.toLowerCase() !== 'null' && rawUrl.toLowerCase() !== 'undefined') ? rawUrl : ''
+    const rawName = businessName || currentLead?.business_name || ''
+    const isDirectContact = rawName.toLowerCase().startsWith('direct contact')
+    const name = isDirectContact ? '' : rawName
     const niche = category || currentLead?.campaigns?.niche || 'Local Business'
 
     let scrapedMarkdown = ''
     let httpStatus = 200
     let siteState = targetUrl ? 'exists' : 'none'
 
-    // 1. Scrape website with Firecrawl if URL is available
+    const existingAudit = Array.isArray(currentLead?.website_audits) 
+      ? currentLead?.website_audits[0] 
+      : currentLead?.website_audits
+
+    // 1. Scrape website with Firecrawl if URL is available (skip if regeneratePitchOnly and existing scraped_text is present)
     if (targetUrl) {
-      console.log(`[Audit] Scraping website with Firecrawl: ${targetUrl}`)
-      try {
-        const firecrawlRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`,
-            formats: ['markdown'],
-            onlyMainContent: true,
-            timeout: 25000
-          }),
-          signal: AbortSignal.timeout(28000)
-        })
+      if (regeneratePitchOnly && existingAudit?.scraped_text) {
+        scrapedMarkdown = existingAudit.scraped_text
+        siteState = currentLead?.site_state || 'exists'
+      } else {
+        console.log(`[Audit] Scraping website with Firecrawl: ${targetUrl}`)
+        try {
+          const firecrawlRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`,
+              formats: ['markdown'],
+              onlyMainContent: true,
+              timeout: 25000
+            }),
+            signal: AbortSignal.timeout(28000)
+          })
 
-        httpStatus = firecrawlRes.status
+          httpStatus = firecrawlRes.status
 
-        if (firecrawlRes.ok) {
-          const fcData = await firecrawlRes.json()
-          if (fcData.success && fcData.data?.markdown) {
-            scrapedMarkdown = fcData.data.markdown.slice(0, 4000) // First 4000 chars is plenty for Gemini
-            const lowerMd = scrapedMarkdown.toLowerCase()
-            const isBroken =
-              lowerMd.includes('404 not found') ||
-              lowerMd.includes("this page isn't available") ||
-              lowerMd.includes("page isn't available") ||
-              lowerMd.includes('page not found') ||
-              lowerMd.includes('error 404') ||
-              lowerMd.includes('domain for sale') ||
-              lowerMd.includes('account suspended') ||
-              lowerMd.includes('website under construction') ||
-              lowerMd.includes('err_name_not_resolved') ||
-              lowerMd.includes('channel does not exist') ||
-              scrapedMarkdown.trim().length < 30
+          if (firecrawlRes.ok) {
+            const fcData = await firecrawlRes.json()
+            if (fcData.success && fcData.data?.markdown) {
+              scrapedMarkdown = fcData.data.markdown.slice(0, 4000)
+              const lowerMd = scrapedMarkdown.toLowerCase()
+              const isBroken =
+                lowerMd.includes('404 not found') ||
+                lowerMd.includes("this page isn't available") ||
+                lowerMd.includes("page isn't available") ||
+                lowerMd.includes('page not found') ||
+                lowerMd.includes('error 404') ||
+                lowerMd.includes('domain for sale') ||
+                lowerMd.includes('account suspended') ||
+                lowerMd.includes('website under construction') ||
+                lowerMd.includes('err_name_not_resolved') ||
+                lowerMd.includes('channel does not exist') ||
+                scrapedMarkdown.trim().length < 30
 
-            siteState = isBroken ? 'broken' : 'exists'
+              siteState = isBroken ? 'broken' : 'exists'
+            } else {
+              scrapedMarkdown = `Website reachable but contained sparse or blocked content.`
+              siteState = 'broken'
+            }
           } else {
-            scrapedMarkdown = `Website reachable but contained sparse or blocked content.`
-            siteState = 'broken'
+            console.warn(`[Audit] Firecrawl status ${firecrawlRes.status}`)
+            scrapedMarkdown = `Failed to scrape website. HTTP Status: ${firecrawlRes.status}`
+            siteState = firecrawlRes.status >= 400 ? 'broken' : 'none'
           }
-        } else {
-          console.warn(`[Audit] Firecrawl status ${firecrawlRes.status}`)
-          scrapedMarkdown = `Failed to scrape website. HTTP Status: ${firecrawlRes.status}`
-          siteState = firecrawlRes.status >= 400 ? 'broken' : 'none'
+        } catch (err: any) {
+          console.error('[Audit] Firecrawl error:', err.message)
+          scrapedMarkdown = `Website connection timed out or unreachable: ${err.message}`
+          siteState = 'broken'
+          httpStatus = 504
         }
-      } catch (err: any) {
-        console.error('[Audit] Firecrawl error:', err.message)
-        scrapedMarkdown = `Website connection timed out or unreachable: ${err.message}`
-        siteState = 'broken'
-        httpStatus = 504
       }
     } else {
       scrapedMarkdown = 'No website registered on Google Maps profile. Business relies purely on local listings.'
@@ -97,46 +109,63 @@ export async function POST(req: Request) {
       httpStatus = 404
     }
 
-    // 2. Analyze with Gemini 3.8 Flash
-    console.log(`[Audit] Running Gemini 3.8 Flash analysis for ${name}`)
+    // 2. High-Converting Pitch Defaults (aligned with user rules)
+    const greeting = name ? `Hey ${name}!` : 'Hey there!'
+    let defaultAiPitch = ''
+    if (siteState === 'none') {
+      defaultAiPitch = `${greeting} Impressed by your Google Maps presence and reviews! Noticed you don't have an official website or booking page linked yet, so many local clients end up choosing competitors who have 1-tap booking. We build modern, high-converting websites with instant WhatsApp booking for businesses. If you'd like, I can share a few of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
+    } else if (siteState === 'broken') {
+      defaultAiPitch = `${greeting} Wanted to give you a quick heads up — noticed your website link on Google Maps (${targetUrl || 'listed on profile'}) is currently not loading / showing an error page. Local clients clicking your profile are bouncing off. We help businesses fix, revamp, and integrate fast WhatsApp booking. If interested, I can share some work samples. Would you be open for a quick 5-minute call or Zoom meeting to discuss fixing this?`
+    } else {
+      defaultAiPitch = `${greeting} Impressed by your Google Maps presence! Checked out ${targetUrl} — looks great, but noticed it lacks a 1-tap WhatsApp booking flow for mobile visitors. Most smartphone clients bounce if they can't message instantly. We help businesses optimize mobile conversion and automate enquiries. If you'd like, I can share some work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
+    }
+
     let auditData = {
-      flaws: [
-        'Lacks 1-click WhatsApp appointment booking button',
-        'Mobile page load optimization needed',
-        'Missing localized customer conversion funnel'
+      flaws: existingAudit?.findings?.flaws || [
+        siteState === 'none'
+          ? 'Zero digital website portal for mobile Google Maps visitors'
+          : 'Lacks 1-click WhatsApp appointment booking button',
+        'Mobile visitors bounce to competitors with faster booking',
+        'Missing localized customer enquiry automation'
       ],
-      strengths: [
+      strengths: existingAudit?.findings?.strengths || [
         'High Google Maps search visibility',
         'Positive local customer reputation'
       ],
       score: targetUrl ? (siteState === 'broken' ? 88 : 78) : 85,
       pitch_angle: siteState === 'none' ? 'No Website Customer Loss' : (siteState === 'broken' ? 'Broken Website Leak' : 'WhatsApp Booking Engine'),
-      ai_pitch: `Hey ${name}! Noticed you have great reviews on Google Maps, but your website ${targetUrl || 'presence'} is missing a quick 1-tap WhatsApp booking flow. Most mobile customers drop off without booking. We built a fast booking page specifically for ${niche} that fixes this. Can I share a 30-sec preview?`
+      ai_pitch: defaultAiPitch
     }
 
+    // 3. Analyze with Gemini
     if (GEMINI_API_KEY) {
       try {
-        const prompt = `You are a world-class B2B Growth Auditor & High-Converting WhatsApp Outreach Copywriter.
+        const prompt = `You are a world-class B2B Growth Auditor & High-Converting WhatsApp Outreach Copywriter for SynchAD Tech.
 Analyze this business:
-- Business Name: "${name}"
+- Business Name: "${name || 'Local Business'}"
 - Industry / Niche: "${niche}"
 - Website URL: "${targetUrl || 'None'}"
-- Scraped Website Content:
+- Scraped Website / Profile Info:
 """
 ${scrapedMarkdown}
 """
 
 Task:
 1. Detect Website Health: Is the URL healthy ("exists"), broken/404/dead/error page ("broken"), or missing ("none")?
-2. Identify 3 to 4 specific, actionable flaws or revenue leaks (e.g. 404 error page losing leads, lack of mobile booking, no WhatsApp chat widget, no clear pricing).
+2. Identify 3 specific, actionable flaws or revenue leaks.
 3. Identify 2 genuine strengths to compliment them on.
-4. Calculate an opportunity score (integer between 60 and 98), where higher means greater urgency/pitch potential.
-5. Define a clear pitch_angle (short phrase, e.g. "Broken Web Link Fix", "Instant WhatsApp Booking System", "Automated Lead Capture").
-6. Write a personalized, high-converting, friendly WhatsApp message (under 60 words):
-   - Hook: Friendly compliment on their business reputation.
-   - Pain/Observation: Point out the specific issue naturally without being offensive.
-   - Low-friction offer: "Mind if I send a 30-sec screen recording showing how to fix this?" or "Can I send a free preview template?"
-   - Must NOT sound like generic AI spam.
+4. Calculate an opportunity score (integer between 65 and 95).
+5. Define a clear pitch_angle (e.g. "No Website Customer Loss", "Broken Web Link Emergency", "Mobile WhatsApp Funnel").
+6. Write a personalized, high-converting WhatsApp outreach message under 60 words:
+   STRICT RULES FOR THE MESSAGE:
+   - Greeting: Start with "${greeting}" (NEVER use "Direct Contact" or a phone number as their name).
+   - NEVER CLAIM THAT YOU HAVE ALREADY BUILT A WEBSITE OR SAMPLE FOR THEM (e.g. NEVER say "We built a website for you" or "We built a demo for your business").
+   - Offer work samples on request: Say "If you'd like, I can share a few of our work samples / recent client case studies".
+   - The Call-To-Action (CTA) MUST ask for a quick 5-minute call or Zoom meeting (e.g. "Would you be open for a quick 5-minute call or Zoom meeting this week?").
+   - Tone: Friendly, professional, zero hype, zero spammy language.
+   - If Website is None: Highlight strong Google Maps profile, but explain missing official site leads to lost enquiries to competitors.
+   - If Website is Broken: Politely alert them that their site link on Google Maps (${targetUrl}) is throwing an error and bouncing potential customers.
+   - If Website Exists: Compliment their site/presence, note mobile visitors bounce because there's no instant 1-tap WhatsApp booking flow.
 
 Respond ONLY with valid JSON in this exact structure:
 {
@@ -148,56 +177,64 @@ Respond ONLY with valid JSON in this exact structure:
   "ai_pitch": "string"
 }`
 
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.3,
-                responseMimeType: 'application/json'
-              }
-            }),
-            signal: AbortSignal.timeout(20000)
-          }
-        )
+        const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash']
+        let rawText = ''
 
-        if (geminiRes.ok) {
-          const geminiJson = await geminiRes.json()
-          const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text
-          if (rawText) {
-            try {
-              const parsed = JSON.parse(rawText)
-              if (parsed.flaws && parsed.ai_pitch) {
-                if (parsed.detected_site_state && ['exists', 'broken', 'none'].includes(parsed.detected_site_state)) {
-                  siteState = parsed.detected_site_state
-                }
-                auditData = {
-                  flaws: parsed.flaws,
-                  strengths: parsed.strengths || auditData.strengths,
-                  score: typeof parsed.score === 'number' ? parsed.score : auditData.score,
-                  pitch_angle: parsed.pitch_angle || auditData.pitch_angle,
-                  ai_pitch: parsed.ai_pitch
-                }
+        for (const model of candidateModels) {
+          try {
+            const geminiRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                  generationConfig: {
+                    temperature: 0.3,
+                    responseMimeType: 'application/json'
+                  }
+                }),
+                signal: AbortSignal.timeout(18000)
               }
-            } catch (pErr) {
-              console.warn('[Audit] Failed to parse Gemini JSON reply:', rawText)
+            )
+
+            if (geminiRes.ok) {
+              const geminiJson = await geminiRes.json()
+              rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
+              if (rawText) break
             }
+          } catch (mErr) {
+            // Try next model
           }
-        } else {
-          console.warn('[Audit] Gemini HTTP error:', geminiRes.status, await geminiRes.text())
+        }
+
+        if (rawText) {
+          try {
+            const parsed = JSON.parse(rawText)
+            if (parsed.ai_pitch) {
+              if (parsed.detected_site_state && ['exists', 'broken', 'none'].includes(parsed.detected_site_state)) {
+                siteState = parsed.detected_site_state
+              }
+              auditData = {
+                flaws: parsed.flaws || auditData.flaws,
+                strengths: parsed.strengths || auditData.strengths,
+                score: typeof parsed.score === 'number' ? parsed.score : auditData.score,
+                pitch_angle: parsed.pitch_angle || auditData.pitch_angle,
+                ai_pitch: parsed.ai_pitch
+              }
+            }
+          } catch (pErr) {
+            console.warn('[Audit] Failed to parse Gemini JSON reply:', rawText)
+          }
         }
       } catch (gErr: any) {
         console.error('[Audit] Gemini API error:', gErr.message)
       }
     }
 
-    // 3. Save to Supabase
+    // 4. Save to Supabase
     let savedAudit: any = null
     if (leadId) {
-      // Upsert website_audits
       const { data: auditRecord, error: auditErr } = await supabase
         .from('website_audits')
         .upsert(
@@ -210,6 +247,7 @@ Respond ONLY with valid JSON in this exact structure:
               strengths: auditData.strengths
             },
             ai_pitch: auditData.ai_pitch,
+            opportunity_score: auditData.score,
             updated_at: new Date().toISOString()
           },
           { onConflict: 'lead_id' }
@@ -223,12 +261,11 @@ Respond ONLY with valid JSON in this exact structure:
         savedAudit = auditRecord
       }
 
-      // Update lead
       await supabase
         .from('leads')
         .update({
           site_state: siteState as any,
-          status: 'enriched',
+          score: auditData.score,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId)
@@ -243,8 +280,10 @@ Respond ONLY with valid JSON in this exact structure:
           flaws: auditData.flaws,
           strengths: auditData.strengths
         },
-        ai_pitch: auditData.ai_pitch
+        ai_pitch: auditData.ai_pitch,
+        opportunity_score: auditData.score
       },
+      ai_pitch: auditData.ai_pitch,
       score: auditData.score,
       pitch_angle: auditData.pitch_angle,
       site_state: siteState
