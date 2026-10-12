@@ -3,57 +3,124 @@
 import React, { useState, useEffect } from 'react'
 import {
   X, Sparkles, Printer, Copy, Check, MessageSquare, ShieldCheck,
-  FileText, Download, Edit3, ArrowRight, RefreshCw
+  FileText, Download, Edit3, ArrowRight, RefreshCw, Phone, MapPin, Building
 } from 'lucide-react'
-import type { Lead } from '@/lib/types'
+import type { Lead, ClientAgreement, AgencyProfile } from '@/lib/types'
+import { useData } from '@/context/DataContext'
 
 interface AgreementModalProps {
-  lead: Lead | null
+  lead?: Lead | null
   isOpen: boolean
   onClose: () => void
   dealData?: {
-    deal_value: number
-    advance_paid: number
-    balance_due: number
-    currency: string
-    service_type: string
-    project_scope: string
+    deal_value?: number
+    advance_paid?: number
+    balance_due?: number
+    currency?: string
+    service_type?: string
+    project_scope?: string
     target_deadline?: string | null
   }
+  onAgreementCreated?: (agreement: ClientAgreement) => void
+}
+
+const DEFAULT_AGENCY: AgencyProfile = {
+  name: 'SynchAD Tech',
+  representative: 'Aryan Gupta',
+  email: 'contact@synchadtech.com',
+  phone: '+91 70675 49982',
+  address: 'Commercial Tower, Sector 62, Noida, UP, India',
+  logo_url: '',
+  gstin: '07AAACS1429B1Z8',
+  upi_id: 'synchadtech@okhdfcbank',
+  bank_name: 'HDFC Bank',
+  account_number: '50200084928192',
+  ifsc_code: 'HDFC0001234'
 }
 
 export default function AgreementModal({
   lead,
   isOpen,
   onClose,
-  dealData
+  dealData,
+  onAgreementCreated
 }: AgreementModalProps) {
+  const { leads } = useData()
+
+  // Agency branding profile
+  const [agency, setAgency] = useState<AgencyProfile>(DEFAULT_AGENCY)
+
+  // Client info
+  const [clientMode, setClientMode] = useState<'existing' | 'custom'>(lead ? 'existing' : 'custom')
+  const [selectedLeadId, setSelectedLeadId] = useState<string>(lead?.id || '')
+  const [clientName, setClientName] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [clientPhone, setClientPhone] = useState('')
+  const [clientAddress, setClientAddress] = useState('')
+
+  // Contract parameters
+  const [dealVal, setDealVal] = useState<number>(dealData?.deal_value || 35000)
+  const [advanceVal, setAdvanceVal] = useState<number>(dealData?.advance_paid || 17500)
+  const [service, setService] = useState(dealData?.service_type || 'Custom Website + WhatsApp Booking Funnel')
+  const [scope, setScope] = useState(dealData?.project_scope || 'Responsive modern website design, mobile speed optimization, and 1-tap WhatsApp booking flow.')
+  const [deadline, setDeadline] = useState(dealData?.target_deadline || '14 Business Days from advance payment')
+
   const [isGenerating, setIsGenerating] = useState(false)
   const [agreementText, setAgreementText] = useState('')
   const [agreementNumber, setAgreementNumber] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+
+  // Load Agency Profile from LocalStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedProfile = localStorage.getItem('synchad_agency_profile')
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile)
+          setAgency(prev => ({ ...prev, ...parsed }))
+        } catch {}
+      }
+    }
+  }, [isOpen])
+
+  // Sync client details from lead prop or selected lead
+  useEffect(() => {
+    if (lead) {
+      setBusinessName(lead.business_name || '')
+      setClientName(lead.owner_name || lead.business_name || '')
+      setClientPhone(lead.phone || '')
+      setClientAddress(lead.address || '')
+      setSelectedLeadId(lead.id)
+      setClientMode('existing')
+    } else if (selectedLeadId) {
+      const found = leads.find(l => l.id === selectedLeadId)
+      if (found) {
+        setBusinessName(found.business_name || '')
+        setClientName(found.owner_name || found.business_name || '')
+        setClientPhone(found.phone || '')
+        setClientAddress(found.address || '')
+      }
+    }
+  }, [lead, selectedLeadId, leads])
 
   useEffect(() => {
-    if (isOpen && lead) {
-      handleGenerateAgreement()
+    if (isOpen) {
+      if (!agreementText) {
+        handleGenerateAgreement()
+      }
     } else {
       setAgreementText('')
       setAgreementNumber('')
       setIsEditing(false)
+      setIsSaved(false)
     }
-  }, [isOpen, lead])
+  }, [isOpen])
 
-  if (!isOpen || !lead) return null
+  if (!isOpen) return null
 
-  const clientName = lead.owner_name || lead.business_name
-  const dealVal = dealData?.deal_value || 35000
-  const advanceVal = dealData?.advance_paid || 17500
-  const balanceVal = dealData?.balance_due || (dealVal - advanceVal)
-  const currency = dealData?.currency || 'INR'
-  const service = dealData?.service_type || 'Custom Website + WhatsApp Booking Funnel'
-  const scope = dealData?.project_scope || 'Responsive website design, mobile speed optimization, and 1-tap WhatsApp booking flow.'
-  const deadline = dealData?.target_deadline || ''
+  const balanceVal = Math.max(0, dealVal - advanceVal)
 
   async function handleGenerateAgreement() {
     setIsGenerating(true)
@@ -62,15 +129,15 @@ export default function AgreementModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          leadId: lead?.id,
-          clientName,
-          businessName: lead?.business_name,
-          phone: lead?.phone,
-          address: lead?.address,
+          leadId: selectedLeadId || null,
+          clientName: clientName || businessName || 'Client Representative',
+          businessName: businessName || clientName || 'Client Business',
+          phone: clientPhone,
+          address: clientAddress,
           dealValue: dealVal,
           advancePaid: advanceVal,
           balanceDue: balanceVal,
-          currency,
+          currency: 'INR',
           serviceType: service,
           projectScope: scope,
           targetDeadline: deadline
@@ -78,14 +145,46 @@ export default function AgreementModal({
       })
 
       const data = await res.json()
-      if (res.ok && data.agreementContent) {
+      if (data.agreementContent) {
         setAgreementText(data.agreementContent)
-        setAgreementNumber(data.agreementNumber)
+        setAgreementNumber(data.agreementNumber || `SYNCH-AGR-${Math.floor(1000 + Math.random() * 9000)}`)
       }
     } catch (err) {
       console.error(err)
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  async function handleSaveAgreement() {
+    if (!agreementText) return
+    try {
+      const res = await fetch('/api/agreements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: selectedLeadId || null,
+          agreementNumber,
+          title: `${service} Agreement — ${businessName || clientName}`,
+          content: agreementText,
+          agencySignatory: `${agency.name} (${agency.representative})`,
+          clientSignatory: clientName || businessName,
+          client_name: businessName || clientName,
+          client_phone: clientPhone,
+          dealValue: dealVal,
+          status: 'sent'
+        })
+      })
+      const data = await res.json()
+      if (res.ok && data.agreement) {
+        setIsSaved(true)
+        if (onAgreementCreated) {
+          onAgreementCreated(data.agreement)
+        }
+        setTimeout(() => setIsSaved(false), 3000)
+      }
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -100,42 +199,47 @@ export default function AgreementModal({
   }
 
   function handleSendWhatsApp() {
-    const cleanPhone = (lead?.phone || '').replace(/[^\d]/g, '')
-    const symbol = currency === 'INR' ? '₹' : '$'
-    const summaryMsg = `Hi ${clientName}! Please find your official SynchAD Tech Service Agreement (${agreementNumber}) details below:
+    const cleanPhone = clientPhone.replace(/[^\d]/g, '')
+    if (!cleanPhone) {
+      alert('Please enter a valid client phone number for WhatsApp dispatch.')
+      return
+    }
 
-📄 Project: ${service}
-💰 Total Investment: ${symbol}${dealVal.toLocaleString()}
-💵 Advance Deposit: ${symbol}${advanceVal.toLocaleString()}
-📅 Target Delivery: ${deadline || '14 Business Days'}
+    const previewMsg = `Hi ${clientName || businessName}! Please review your official Service Agreement (${agreementNumber}) from ${agency.name}:
 
-We are preparing the formal legal copy for your records. Looking forward to launching your new digital platform!`
+📜 Agreement: ${service}
+💼 Deal Value: ₹${Number(dealVal).toLocaleString()} (Advance: ₹${Number(advanceVal).toLocaleString()})
+📅 Estimated Delivery: ${deadline}
+
+You can review and sign the full agreement text below:
+----------------------------------------
+${agreementText.slice(0, 700)}...
+
+Please confirm acceptance so we can commence development immediately!`
 
     const isDesktop = typeof window !== 'undefined' && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     const url = isDesktop
-      ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(summaryMsg)}`
-      : `https://wa.me/${cleanPhone}?text=${encodeURIComponent(summaryMsg)}`
+      ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(previewMsg)}`
+      : `https://wa.me/${cleanPhone}?text=${encodeURIComponent(previewMsg)}`
     window.open(url, '_blank')
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-fade-in" role="dialog" aria-modal="true">
-      {/* Backdrop */}
       <div className="fixed inset-0 bg-black/80 backdrop-blur-md cursor-pointer" onClick={onClose} />
 
-      {/* Modal Container */}
-      <div className="relative w-full max-w-4xl h-[92vh] max-h-[850px] bg-white dark:bg-[#161B22] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-stone-800 flex flex-col overflow-hidden z-10 print:fixed print:inset-0 print:h-auto print:max-h-none print:w-full print:border-none print:shadow-none print:rounded-none">
+      <div className="relative w-full max-w-4xl h-[94vh] max-h-[920px] bg-white dark:bg-[#161B22] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-stone-800 flex flex-col overflow-hidden z-10 print:fixed print:inset-0 print:h-auto print:max-h-none print:w-full print:border-none print:shadow-none print:rounded-none">
 
-        {/* Header Bar */}
+        {/* Top Header */}
         <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-slate-200 dark:border-stone-800 bg-slate-50/95 dark:bg-[#1C2128] flex items-center justify-between gap-4 shrink-0 print:hidden">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
-              <ShieldCheck size={20} />
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+              <ShieldCheck size={22} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
-                  AI Legal Service Agreement Studio
+                  AI Service Agreement Studio
                 </h2>
                 {agreementNumber && (
                   <span className="text-xs px-2 py-0.5 rounded-md font-mono bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 font-bold">
@@ -143,20 +247,18 @@ We are preparing the formal legal copy for your records. Looking forward to laun
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Official B2B Contract for <strong>{lead.business_name}</strong> • Powered by Google Gemini
+              <p className="text-xs text-slate-500">
+                Generate, review, and print legally-binding B2B software service contracts with Gemini AI.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 dark:hover:bg-stone-800 cursor-pointer"
-            >
-              <X size={18} />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 dark:hover:bg-stone-800 cursor-pointer"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Action Toolbar */}
@@ -165,10 +267,10 @@ We are preparing the formal legal copy for your records. Looking forward to laun
             <button
               onClick={handleGenerateAgreement}
               disabled={isGenerating}
-              className="btn btn-secondary py-2 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer text-purple-700 dark:text-purple-300 disabled:opacity-50"
+              className="btn btn-secondary py-2 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer text-indigo-700 dark:text-indigo-300"
             >
               <RefreshCw size={13} className={isGenerating ? 'animate-spin' : ''} />
-              {isGenerating ? 'Drafting via AI...' : 'Re-Draft Contract'}
+              {isGenerating ? 'Drafting Contract...' : 'Regenerate AI'}
             </button>
 
             <button
@@ -178,6 +280,14 @@ We are preparing the formal legal copy for your records. Looking forward to laun
               <Edit3 size={13} />
               {isEditing ? 'Preview Mode' : 'Edit Clauses'}
             </button>
+
+            <button
+              onClick={handleSaveAgreement}
+              className="btn btn-secondary py-2 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer text-emerald-700 dark:text-emerald-300"
+            >
+              <Check size={13} />
+              {isSaved ? 'Saved to Records!' : 'Save Contract'}
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -185,8 +295,8 @@ We are preparing the formal legal copy for your records. Looking forward to laun
               onClick={handleCopy}
               className="btn btn-secondary py-2 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
             >
-              {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-              {copied ? 'Copied' : 'Copy Text'}
+              {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+              {copied ? 'Copied!' : 'Copy Text'}
             </button>
 
             <button
@@ -202,66 +312,148 @@ We are preparing the formal legal copy for your records. Looking forward to laun
               className="btn bg-[#25D366] hover:bg-[#1ea952] text-white py-2 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
             >
               <MessageSquare size={13} />
-              Send to Client WA
+              Send on WhatsApp
             </button>
           </div>
         </div>
 
-        {/* Document Content Viewport */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 md:p-10 bg-slate-100 dark:bg-[#0D1117] print:bg-white print:p-0">
-          {isGenerating ? (
-            <div className="h-full flex flex-col items-center justify-center space-y-4 py-16">
-              <div className="w-10 h-10 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-              <div className="text-center">
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Formulating Legal Terms with Google Gemini AI...
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Drafting customized scope, IP ownership, milestone payments, and confidentiality clauses.
-                </p>
+        {/* Client Selector (when opened without lead) */}
+        {!lead && (
+          <div className="p-3 sm:px-6 bg-slate-50 dark:bg-stone-800/40 border-b border-slate-200 dark:border-stone-800 flex flex-wrap items-center gap-3 text-xs print:hidden">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-700 dark:text-slate-300">Client Source:</span>
+              <button
+                type="button"
+                onClick={() => setClientMode('existing')}
+                className={`px-2.5 py-1 rounded-lg font-bold ${clientMode === 'existing' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-stone-900 border text-slate-600'}`}
+              >
+                CRM Lead
+              </button>
+              <button
+                type="button"
+                onClick={() => setClientMode('custom')}
+                className={`px-2.5 py-1 rounded-lg font-bold ${clientMode === 'custom' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-stone-900 border text-slate-600'}`}
+              >
+                Custom Client
+              </button>
+            </div>
+
+            {clientMode === 'existing' ? (
+              <select
+                value={selectedLeadId}
+                onChange={e => setSelectedLeadId(e.target.value)}
+                className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 font-bold"
+              >
+                <option value="">-- Choose Existing Lead --</option>
+                {leads.map(l => (
+                  <option key={l.id} value={l.id}>
+                    {l.business_name} ({l.phone})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <input
+                  type="text"
+                  placeholder="Client / Business Name"
+                  value={businessName}
+                  onChange={e => setBusinessName(e.target.value)}
+                  className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 font-bold text-xs"
+                />
+                <input
+                  type="text"
+                  placeholder="WhatsApp Phone"
+                  value={clientPhone}
+                  onChange={e => setClientPhone(e.target.value)}
+                  className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-xs w-36"
+                />
               </div>
-            </div>
-          ) : isEditing ? (
-            <div className="h-full flex flex-col">
-              <textarea
-                value={agreementText}
-                onChange={(e) => setAgreementText(e.target.value)}
-                className="w-full flex-1 p-5 rounded-2xl bg-white dark:bg-stone-900 border-2 border-purple-300 dark:border-purple-700 text-xs sm:text-sm font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed resize-none"
-              />
-            </div>
-          ) : (
-            <div className="max-w-[760px] mx-auto bg-white dark:bg-stone-900 shadow-lg border border-slate-200 dark:border-stone-800 rounded-2xl p-6 sm:p-10 text-slate-900 dark:text-slate-100 print:shadow-none print:border-none print:p-0">
-              {/* Official Document Letterhead */}
-              <div className="pb-6 border-b border-slate-200 dark:border-stone-700 flex justify-between items-start gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-black tracking-tight text-indigo-700 dark:text-indigo-400">
-                      SynchAD Tech
-                    </span>
-                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      Agency OS
-                    </span>
+            )}
+          </div>
+        )}
+
+        {/* Scrollable Document Area */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 bg-slate-100 dark:bg-[#0D1117] print:bg-white print:p-0">
+          <div className="max-w-[760px] mx-auto bg-white dark:bg-stone-900 shadow-xl border border-slate-200 dark:border-stone-800 rounded-3xl p-6 sm:p-10 text-slate-900 dark:text-slate-100 print:shadow-none print:border-none print:p-0 space-y-6">
+
+            {/* Letterhead */}
+            <div className="flex justify-between items-start gap-4 pb-6 border-b border-slate-200 dark:border-stone-800">
+              <div className="flex items-center gap-3">
+                {agency.logo_url ? (
+                  <img
+                    src={agency.logo_url}
+                    alt={agency.name}
+                    className="w-12 h-12 object-contain rounded-xl border border-slate-200 dark:border-stone-700 bg-white"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black flex items-center justify-center text-lg">
+                    {agency.name.charAt(0)}
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                    Digital Product Engineering & Automated Growth Systems
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 block">
-                    {agreementNumber || 'CONTRACT'}
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                )}
+                <div>
+                  <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {agency.name}
+                  </h1>
+                  <span className="text-[11px] text-slate-500 font-semibold block">
+                    B2B Technology & Software Services Agreement
                   </span>
                 </div>
               </div>
 
-              {/* Formatted Contract Text */}
-              <div className="prose prose-sm dark:prose-invert max-w-none pt-6 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                {agreementText}
+              <div className="text-right">
+                <span className="text-xs font-mono font-bold text-purple-700 dark:text-purple-300 block">
+                  #{agreementNumber}
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-0.5">
+                  Effective Date: {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
               </div>
             </div>
-          )}
+
+            {/* Editor or Markdown View */}
+            {isGenerating ? (
+              <div className="py-20 text-center space-y-3">
+                <RefreshCw size={24} className="animate-spin text-purple-600 mx-auto" />
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                  Google Gemini AI is drafting your custom agreement clauses...
+                </p>
+                <p className="text-xs text-slate-500">
+                  Formatting IP ownership, warranty, delivery milestones, and payment schedule.
+                </p>
+              </div>
+            ) : isEditing ? (
+              <textarea
+                value={agreementText}
+                onChange={(e) => setAgreementText(e.target.value)}
+                rows={22}
+                className="w-full p-4 rounded-2xl border border-slate-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-xs text-slate-800 dark:text-slate-200 outline-none leading-relaxed"
+              />
+            ) : (
+              <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm font-serif leading-relaxed whitespace-pre-wrap text-slate-800 dark:text-slate-200">
+                {agreementText || 'No contract text drafted yet. Click Regenerate AI above.'}
+              </div>
+            )}
+
+            {/* Signature Block for Print */}
+            <div className="pt-8 border-t border-slate-200 dark:border-stone-800 flex justify-between items-end text-xs">
+              <div>
+                <p className="font-bold text-slate-800 dark:text-slate-200">Accepted & Signed (Client):</p>
+                <div className="mt-8 border-b border-slate-400 w-44"></div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {clientName || businessName || 'Authorized Client Representative'}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <p className="font-bold text-slate-800 dark:text-slate-200">For {agency.name}:</p>
+                <div className="mt-8 border-b border-slate-400 w-44 ml-auto"></div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {agency.representative} (Authorized Signatory)
+                </p>
+              </div>
+            </div>
+
+          </div>
         </div>
 
       </div>

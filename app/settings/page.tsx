@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Save, Key, MessageCircle, User, Shield, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { Save, Key, MessageCircle, User, Shield, CheckCircle2, ShieldCheck, Upload, Building, CreditCard, Banknote } from 'lucide-react'
 import Toast, { ToastMessage } from '@/components/Toast'
+import type { AgencyProfile } from '@/lib/types'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'api' | 'whatsapp' | 'security'>('api')
@@ -25,19 +26,52 @@ export default function SettingsPage() {
   const [pinEnabled, setPinEnabled] = useState(false)
   const [adminPin, setAdminPin] = useState('1234')
 
+  // Agency Profile State
+  const [agencyProfile, setAgencyProfile] = useState<AgencyProfile>({
+    name: 'SynchAD Tech',
+    representative: 'Aryan Gupta',
+    email: 'contact@synchadtech.com',
+    phone: '+91 70675 49982',
+    address: 'Commercial Tower, Sector 62, Noida, UP, India',
+    logo_url: '',
+    gstin: '07AAACS1429B1Z8',
+    upi_id: 'synchadtech@okhdfcbank',
+    bank_name: 'HDFC Bank',
+    account_number: '50200084928192',
+    ifsc_code: 'HDFC0001234'
+  })
+
   React.useEffect(() => {
     setPinEnabled(localStorage.getItem('synchad_admin_pin_enabled') === 'true')
     setAdminPin(localStorage.getItem('synchad_admin_pin') || '1234')
+    const saved = localStorage.getItem('synchad_agency_profile')
+    if (saved) {
+      try {
+        setAgencyProfile(prev => ({ ...prev, ...JSON.parse(saved) }))
+      } catch {}
+    }
   }, [])
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        setAgencyProfile(prev => ({ ...prev, logo_url: reader.result as string }))
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
     localStorage.setItem('synchad_admin_pin_enabled', String(pinEnabled))
     localStorage.setItem('synchad_admin_pin', adminPin)
+    localStorage.setItem('synchad_agency_profile', JSON.stringify(agencyProfile))
     setToast({
       id: String(Date.now()),
       title: 'Settings Saved',
-      description: 'Your configuration and security credentials have been updated.',
+      description: 'Your agency profile, logo, and credentials have been updated.',
       type: 'success'
     })
   }
@@ -239,38 +273,174 @@ export default function SettingsPage() {
 
               {/* TAB 3: AGENCY PROFILE */}
               {activeTab === 'profile' && (
-                <div className="space-y-5 animate-fade-in">
+                <div className="space-y-6 animate-fade-in">
                   <div>
-                    <h3 className="text-base font-extrabold text-[var(--foreground)]">Agency Profile</h3>
-                    <p className="text-xs text-[var(--ink-muted)] mt-0.5">Configure your outreach sender persona.</p>
+                    <h3 className="text-base font-extrabold text-[var(--foreground)]">Agency Branding & Invoice Profile</h3>
+                    <p className="text-xs text-[var(--ink-muted)] mt-0.5">
+                      Your agency logo, business address, and banking details are automatically rendered on all Invoices & Legal Agreements.
+                    </p>
                   </div>
 
-                  <div className="space-y-4">
+                  {/* Logo Upload Section */}
+                  <div className="p-5 bg-[var(--surface-alt)] rounded-2xl border border-[var(--line)] space-y-4">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] block">
+                      Official Agency Logo
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      {agencyProfile.logo_url ? (
+                        <div className="relative group">
+                          <img
+                            src={agencyProfile.logo_url}
+                            alt="Agency Logo"
+                            className="w-20 h-20 object-contain rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setAgencyProfile(prev => ({ ...prev, logo_url: '' }))}
+                            className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-rose-600 text-white text-xs font-bold flex items-center justify-center hover:scale-105"
+                            title="Remove logo"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border-2 border-dashed border-indigo-300 dark:border-indigo-700 flex flex-col items-center justify-center text-indigo-600 dark:text-indigo-400">
+                          <Upload size={22} />
+                          <span className="text-[9px] font-bold mt-1">No Logo</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-2 flex-1 w-full">
+                        <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold cursor-pointer hover:bg-indigo-700 shadow-sm shadow-indigo-500/25">
+                          <Upload size={13} /> Upload Image (PNG/JPG/SVG)
+                          <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                        </label>
+                        <p className="text-[11px] text-[var(--ink-muted)]">
+                          Recommended format: Square or landscape transparent PNG (min 200x200px).
+                        </p>
+                        <input
+                          type="url"
+                          placeholder="Or paste direct image URL (https://...)"
+                          value={agencyProfile.logo_url}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, logo_url: e.target.value })}
+                          className="form-input text-xs font-mono w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* General Agency Info */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Agency / Company Name</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Agency / Legal Entity Name</label>
                       <input
                         type="text"
-                        defaultValue="Autonomous AI Outreach Partner"
-                        className="form-input text-xs"
+                        value={agencyProfile.name}
+                        onChange={e => setAgencyProfile({ ...agencyProfile, name: e.target.value })}
+                        className="form-input text-xs font-bold"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Sender Representative Name</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Authorized Signatory Name</label>
                       <input
                         type="text"
-                        defaultValue="Aryan Gupta"
-                        className="form-input text-xs"
+                        value={agencyProfile.representative}
+                        onChange={e => setAgencyProfile({ ...agencyProfile, representative: e.target.value })}
+                        className="form-input text-xs font-bold"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Primary Notification Email</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Official Email</label>
                       <input
                         type="email"
-                        defaultValue="admin@leadgencrm.io"
-                        className="form-input text-xs"
+                        value={agencyProfile.email}
+                        onChange={e => setAgencyProfile({ ...agencyProfile, email: e.target.value })}
+                        className="form-input text-xs font-medium"
                       />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Official Phone / WhatsApp</label>
+                      <input
+                        type="text"
+                        value={agencyProfile.phone}
+                        onChange={e => setAgencyProfile({ ...agencyProfile, phone: e.target.value })}
+                        className="form-input text-xs font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Registered Business Address</label>
+                    <textarea
+                      rows={2}
+                      value={agencyProfile.address}
+                      onChange={e => setAgencyProfile({ ...agencyProfile, address: e.target.value })}
+                      className="form-input text-xs font-medium resize-none"
+                    />
+                  </div>
+
+                  {/* Banking & Remittance Details */}
+                  <div className="p-5 bg-[var(--surface-alt)] rounded-2xl border border-[var(--line)] space-y-4">
+                    <div className="flex items-center gap-2">
+                      <CreditCard size={16} className="text-indigo-600" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-[var(--foreground)]">
+                        Payment & Banking Details (Appears on Invoices)
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-[var(--ink-muted)]">UPI ID (e.g. name@bank)</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.upi_id}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, upi_id: e.target.value })}
+                          className="form-input text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-[var(--ink-muted)]">GSTIN / Tax ID (Optional)</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.gstin}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, gstin: e.target.value })}
+                          className="form-input text-xs font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-[var(--ink-muted)]">Bank Name</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.bank_name}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, bank_name: e.target.value })}
+                          className="form-input text-xs font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-[var(--ink-muted)]">Bank Account Number</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.account_number}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, account_number: e.target.value })}
+                          className="form-input text-xs font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-[var(--ink-muted)]">IFSC Code</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.ifsc_code}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, ifsc_code: e.target.value })}
+                          className="form-input text-xs font-mono uppercase"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

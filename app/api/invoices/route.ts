@@ -101,3 +101,60 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json()
+    const { id, invoice_number, status, notes } = body
+
+    if (!id && !invoice_number) {
+      return NextResponse.json({ error: 'Invoice ID or Number required' }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+    if (status) updates.status = status
+    if (notes !== undefined) updates.notes = notes
+
+    let query = supabase.from('client_invoices').update(updates)
+    if (id) query = query.eq('id', id)
+    else query = query.eq('invoice_number', invoice_number)
+
+    const { data, error } = await query.select().single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, invoice: data })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    const invNum = searchParams.get('invoice_number')
+
+    if (!id && !invNum) {
+      return NextResponse.json({ error: 'Invoice ID or number required' }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+    let query = supabase.from('client_invoices').delete()
+    if (id) query = query.eq('id', id)
+    else query = query.eq('invoice_number', invNum)
+
+    const { error } = await query
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+

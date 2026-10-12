@@ -134,21 +134,24 @@ export interface ClientDeal {
 
 export interface ClientAgreement {
   id?: string
-  lead_id: string
+  lead_id?: string | null
   agreement_number: string
   title: string
   content: string
   agency_signatory: string
   client_signatory: string
+  client_name?: string
+  client_phone?: string
   effective_date: string
   deal_value: number
+  status?: 'draft' | 'sent' | 'signed' | 'completed'
   created_at?: string
 }
 
 export interface ClientInvoice {
   id?: string
   invoice_number: string
-  lead_id: string
+  lead_id?: string | null
   client_name: string
   client_phone: string
   client_address?: string
@@ -167,4 +170,19 @@ export interface ClientInvoice {
   payment_mode?: PaymentMode
   created_at?: string
 }
+
+export interface AgencyProfile {
+  name: string
+  representative: string
+  email: string
+  phone: string
+  address: string
+  logo_url: string
+  gstin?: string
+  upi_id?: string
+  bank_name?: string
+  account_number?: string
+  ifsc_code?: string
+}
+
 
