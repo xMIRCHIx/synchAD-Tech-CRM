@@ -109,3 +109,60 @@ export interface WaTemplate {
   is_active: boolean
   created_at: string
 }
+
+// Agency Operating System Types
+export type DealStage = 'closing' | 'in_development' | 'review' | 'delivered' | 'maintenance'
+export type PaymentMode = 'upi' | 'bank_transfer' | 'cash' | 'stripe'
+
+export interface ClientDeal {
+  id?: string
+  lead_id: string
+  deal_value: number
+  advance_paid: number
+  balance_due: number
+  currency: 'INR' | 'USD'
+  payment_mode: PaymentMode
+  service_type: string
+  project_scope: string
+  target_deadline?: string | null
+  stage: DealStage
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ClientAgreement {
+  id?: string
+  lead_id: string
+  agreement_number: string
+  title: string
+  content: string
+  agency_signatory: string
+  client_signatory: string
+  effective_date: string
+  deal_value: number
+  created_at?: string
+}
+
+export interface ClientInvoice {
+  id?: string
+  invoice_number: string
+  lead_id: string
+  client_name: string
+  client_phone: string
+  client_address?: string
+  amount: number
+  status: 'draft' | 'unpaid' | 'paid' | 'overdue'
+  installment_label: string
+  issue_date: string
+  due_date: string
+  items: Array<{
+    description: string
+    quantity: number
+    rate: number
+    amount: number
+  }>
+  notes?: string
+  payment_mode?: PaymentMode
+  created_at?: string
+}
+

@@ -103,7 +103,7 @@ export default function DashboardOverview() {
               Convert Local Google Maps Visitors into Paying Clients
             </h2>
             <p className="text-xs md:text-sm text-indigo-50 font-medium leading-relaxed max-w-xl">
-              Apify extracts verified Google Maps places, Firecrawl audits mobile website flaws, and Gemini 3.8 Flash writes personalized WhatsApp hooks ready to send in 1 click.
+              Apify extracts verified Google Maps places, Firecrawl audits mobile website flaws, and Google Gemini AI writes personalized WhatsApp hooks ready to send in 1 click.
             </p>
 
             <div className="pt-2 flex flex-wrap gap-3">

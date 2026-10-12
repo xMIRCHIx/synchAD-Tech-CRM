@@ -838,7 +838,7 @@ export default function NewCampaignPage() {
                 />
                 <div>
                   <span className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-1.5">
-                    ⚡ Auto-run Firecrawl + Gemini 3.8 Flash AI
+                    ⚡ Auto-run Firecrawl + Google Gemini 2.5 Flash AI
                   </span>
                   <span className="text-xs text-[var(--muted-foreground)]">
                     Automatically scans websites and crafts personalized WhatsApp pitches for each lead.
@@ -906,7 +906,7 @@ export default function NewCampaignPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[var(--muted-foreground)]">AI Engine</span>
-                <span className="font-mono text-purple-500">Gemini 3.8 Flash</span>
+                <span className="font-mono text-purple-500">Gemini 2.5 Flash</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[var(--muted-foreground)]">Website Filter</span>

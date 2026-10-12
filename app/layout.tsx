@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
 import Sidebar from '@/components/Sidebar'
 import TopHeader from '@/components/TopHeader'
+import AdminLockGate from '@/components/AdminLockGate'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { DataProvider } from '@/context/DataContext'
 
@@ -37,6 +38,7 @@ export default function RootLayout({
           disableTransitionOnChange={false}
         >
           <DataProvider>
+            <AdminLockGate />
             <Suspense fallback={null}>
               <Sidebar />
             </Suspense>

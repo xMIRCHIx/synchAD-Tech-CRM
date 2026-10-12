@@ -273,7 +273,7 @@ export default function LeadDetailPanel({
 
     try {
       setTimeout(() => {
-        setAuditStep('Analyzing with Gemini 3.8 Flash & writing pitch...')
+        setAuditStep('Analyzing with Google Gemini AI & writing pitch...')
       }, 1500)
 
       const res = await fetch('/api/audit', {
@@ -716,7 +716,7 @@ export default function LeadDetailPanel({
                     Live Firecrawl & Gemini Audit
                   </h4>
                   <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                    Scan their website code, mobile responsiveness, and appointment friction with Firecrawl, then generate a personalized WhatsApp conversion pitch via Gemini 3.8 Flash.
+                    Scan their website code, mobile responsiveness, and appointment friction with Firecrawl, then generate a personalized WhatsApp conversion pitch via Google Gemini 2.5 Flash.
                   </p>
                   <button
                     onClick={handleRunAudit}

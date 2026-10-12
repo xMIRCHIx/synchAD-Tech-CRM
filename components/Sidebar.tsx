@@ -18,7 +18,8 @@ import {
   LayoutDashboard,
   PartyPopper,
   Compass,
-  UserPlus
+  UserPlus,
+  Receipt
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/leads', icon: Users, label: 'Leads Pipeline' },
   { href: '/custom-leads', icon: UserPlus, label: 'Custom Leads' },
   { href: '/clients', icon: PartyPopper, label: 'Won Clients' },
+  { href: '/invoices', icon: Receipt, label: 'Invoices' },
   { href: '/inbox', icon: MessageSquare, label: 'WhatsApp Inbox' },
   { href: '/campaigns', icon: Target, label: 'Campaigns' },
   { href: '/whatsapp-profile', icon: ShieldCheck, label: 'WhatsApp Profile' },

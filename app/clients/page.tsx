@@ -1,12 +1,17 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import type { Lead, LeadStatus } from '@/lib/types'
+import type { Lead, LeadStatus, ClientDeal } from '@/lib/types'
 import {
   Search, RefreshCw, CheckCircle2, Phone, MapPin, Mail, ShieldCheck, Globe,
-  PartyPopper, TrendingUp, DollarSign, ExternalLink, Sparkles
+  PartyPopper, TrendingUp, DollarSign, ExternalLink, Sparkles, Receipt,
+  Briefcase, FileText, MessageSquare, Plus, Calendar, CreditCard, Banknote,
+  ChevronRight, ArrowUpRight
 } from 'lucide-react'
 import LeadDetailPanel from '@/components/LeadDetailPanel'
+import DealDossierModal from '@/components/DealDossierModal'
+import AgreementModal from '@/components/AgreementModal'
+import InvoiceModal from '@/components/InvoiceModal'
 import Toast, { ToastMessage } from '@/components/Toast'
 import { useData } from '@/context/DataContext'
 
@@ -18,6 +23,28 @@ export default function ClientsDashboard() {
   const [search, setSearch] = useState('')
   const [selectedClient, setSelectedClient] = useState<Lead | null>(null)
   const [toast, setToast] = useState<ToastMessage | null>(null)
+
+  // Deal, Agreement & Invoice Modals
+  const [dealModalClient, setDealModalClient] = useState<Lead | null>(null)
+  const [agreementModalClient, setAgreementModalClient] = useState<Lead | null>(null)
+  const [invoiceModalClient, setInvoiceModalClient] = useState<Lead | null>(null)
+  const [dealsMap, setDealsMap] = useState<Record<string, ClientDeal>>({})
+
+  useEffect(() => {
+    // Parse any existing deals stored in notes or state
+    const map: Record<string, ClientDeal> = {}
+    for (const c of clients) {
+      if (c.notes) {
+        try {
+          const parsed = JSON.parse(c.notes)
+          if (parsed?.__deal) {
+            map[c.id] = parsed.__deal
+          }
+        } catch {}
+      }
+    }
+    setDealsMap(prev => ({ ...prev, ...map }))
+  }, [clients])
 
   async function handleUpdateStatus(id: string, newStatus: LeadStatus) {
     try {
@@ -31,19 +58,41 @@ export default function ClientsDashboard() {
     } catch (err) {}
   }
 
+  function handleDealSaved(deal: ClientDeal) {
+    setDealsMap(prev => ({ ...prev, [deal.lead_id]: deal }))
+    refreshAll(true)
+    setToast({
+      id: String(Date.now()),
+      title: 'Deal Dossier Saved',
+      description: `Updated project scope & financials (${deal.currency === 'INR' ? '₹' : '$'}${deal.deal_value.toLocaleString()}).`,
+      type: 'success'
+    })
+  }
+
   const filteredClients = clients.filter((l) => {
     return l.business_name.toLowerCase().includes(search.toLowerCase()) ||
       l.phone.includes(search) ||
       (l.address && l.address.toLowerCase().includes(search.toLowerCase()))
   })
 
-  // Estimated pipeline retainer metrics
-  const estRetainer = clients.length * 350
+  // Financial aggregates
+  const totalContracted = clients.reduce((acc, c) => {
+    const deal = dealsMap[c.id]
+    return acc + (deal ? Number(deal.deal_value) || 0 : 35000)
+  }, 0)
+
+  const totalAdvanceCollected = clients.reduce((acc, c) => {
+    const deal = dealsMap[c.id]
+    return acc + (deal ? Number(deal.advance_paid) || 0 : 17500)
+  }, 0)
+
+  const totalReceivables = Math.max(0, totalContracted - totalAdvanceCollected)
 
   return (
     <>
       <Toast toast={toast} onDismiss={() => setToast(null)} />
-      
+
+      {/* Lead Dossier Detail Modal */}
       <LeadDetailPanel
         lead={selectedClient}
         onClose={() => setSelectedClient(null)}
@@ -51,176 +100,275 @@ export default function ClientsDashboard() {
         onUpdateStatus={handleUpdateStatus}
       />
 
+      {/* Deal Financials & Scope Modal */}
+      <DealDossierModal
+        lead={dealModalClient}
+        isOpen={Boolean(dealModalClient)}
+        onClose={() => setDealModalClient(null)}
+        onSaved={handleDealSaved}
+      />
+
+      {/* AI Legal Agreement Modal */}
+      <AgreementModal
+        lead={agreementModalClient}
+        isOpen={Boolean(agreementModalClient)}
+        onClose={() => setAgreementModalClient(null)}
+        dealData={agreementModalClient ? dealsMap[agreementModalClient.id] : undefined}
+      />
+
+      {/* Milestone Invoice Modal */}
+      <InvoiceModal
+        lead={invoiceModalClient}
+        isOpen={Boolean(invoiceModalClient)}
+        onClose={() => setInvoiceModalClient(null)}
+        dealData={invoiceModalClient ? dealsMap[invoiceModalClient.id] : undefined}
+      />
+
       <div className="p-5 md:p-8 max-w-[1440px] mx-auto space-y-7 animate-fade-in pb-24">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--line)]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-stone-800">
           <div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <h1 className="text-2xl font-extrabold tracking-tight text-[var(--foreground)] flex items-center gap-2">
-                Won Clients Portfolio <PartyPopper className="text-emerald-500" size={24} />
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                Won Clients & Deal Portfolio <PartyPopper className="text-emerald-500" size={24} />
               </h1>
             </div>
-            <p className="text-xs text-[var(--ink-muted)] mt-1">
-              Manage your successfully converted businesses, retainers, and ongoing active client dossiers.
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Complete Agency OS: Deal Dossiers, AI Legal Service Agreements, Milestone Invoices & Revenue Intelligence.
             </p>
           </div>
 
-          <button
-            onClick={() => refreshAll(false)}
-            disabled={isRefreshing}
-            className="btn btn-secondary px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-emerald-500' : 'text-emerald-500'} />
-            Sync Portfolio
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => refreshAll(false)}
+              disabled={isRefreshing}
+              className="btn btn-secondary px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-emerald-500' : 'text-emerald-500'} />
+              Sync Portfolio
+            </button>
+          </div>
         </div>
 
-        {/* Top KPI Cards (Pastel Tinted Tops) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Financial KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="kpi-card kpi-card-green">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                Total Converted Clients
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                Total Contracted Revenue
               </span>
-              <div className="kpi-icon-bubble w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 size={16} />
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                <DollarSign size={16} />
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {clients.length}
+            <div className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-300 font-mono tracking-tight">
+              ₹{totalContracted.toLocaleString()}
             </div>
-            <p className="text-[11px] text-[var(--ink-muted)] mt-1">
-              Active paying B2B accounts
+            <p className="text-[11px] text-slate-500 mt-1 font-semibold">
+              From {clients.length} closed clients
             </p>
           </div>
 
           <div className="kpi-card kpi-card-blue">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                Estimated Monthly Value
+              <span className="text-[11px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                Advance Paid / Realized
               </span>
-              <div className="kpi-icon-bubble w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                <TrendingUp size={16} />
+              <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600">
+                <CheckCircle2 size={16} />
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">
-              ${estRetainer.toLocaleString()}
+            <div className="text-2xl sm:text-3xl font-black text-blue-700 dark:text-blue-300 font-mono tracking-tight">
+              ₹{totalAdvanceCollected.toLocaleString()}
             </div>
-            <p className="text-[11px] text-[var(--ink-muted)] mt-1">
-              Based on $350/mo average retainer
+            <p className="text-[11px] text-slate-500 mt-1 font-semibold">
+              Bank / UPI & Cash received
             </p>
           </div>
 
           <div className="kpi-card kpi-card-amber">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                Client Satisfaction
+              <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                Pending Balance Receivables
               </span>
-              <div className="kpi-icon-bubble w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                <Sparkles size={16} />
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+                <TrendingUp size={16} />
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
-              100%
+            <div className="text-2xl sm:text-3xl font-black text-amber-700 dark:text-amber-300 font-mono tracking-tight">
+              ₹{totalReceivables.toLocaleString()}
             </div>
-            <p className="text-[11px] text-[var(--ink-muted)] mt-1">
-              Zero churn recorded
+            <p className="text-[11px] text-slate-500 mt-1 font-semibold">
+              Due upon final delivery
+            </p>
+          </div>
+
+          <div className="kpi-card kpi-card-purple">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                Active Client Accounts
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-600">
+                <PartyPopper size={16} />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-purple-700 dark:text-purple-300 font-mono tracking-tight">
+              {clients.length}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1 font-semibold">
+              100% Client retention
             </p>
           </div>
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="p-3.5 bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-xs">
-          <div className="relative w-full max-w-md">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-faint)]" />
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Search won clients by name, address, or phone..."
+              placeholder="Search won clients by business name, phone, city..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs bg-[var(--surface-alt)] border border-[var(--line)] rounded-xl text-[var(--foreground)] outline-none focus:bg-[var(--surface)] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 text-xs sm:text-sm font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </div>
 
-        {/* Grid of Clients (Curved Cards, No Sharp Cuts) */}
-        {loading ? (
-          <div className="py-16 text-center text-xs text-[var(--ink-muted)]">
-            <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-emerald-500" />
-            Loading won clients portfolio...
-          </div>
-        ) : filteredClients.length === 0 ? (
-          <div className="py-16 text-center text-xs text-[var(--ink-muted)] space-y-2 hkb-card p-10">
-            <CheckCircle2 size={32} className="mx-auto text-emerald-500/60 mb-2" />
-            <p className="font-bold text-sm text-[var(--foreground)]">No converted clients yet.</p>
-            <p>Pitch your queued leads in the Leads Pipeline to celebrate your first won client!</p>
+        {/* Clients Grid */}
+        {filteredClients.length === 0 ? (
+          <div className="p-12 text-center rounded-3xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-3">
+            <PartyPopper size={36} className="mx-auto text-slate-400" />
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+              No won clients found
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              When you close deals from your WhatsApp Inbox or Lead Pipeline, mark them as <strong>Won 🏆</strong> to manage their contracts, project deliverables, and milestone invoices here.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredClients.map((client) => (
-              <div
-                key={client.id}
-                className="hkb-card p-5 hover:border-emerald-500/40 transition-all group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="min-w-0">
-                      <h3 className="font-extrabold text-sm text-[var(--foreground)] group-hover:text-emerald-600 transition-colors truncate">
-                        {client.business_name}
-                      </h3>
-                      <p className="text-[11px] text-[var(--ink-muted)] mt-0.5 flex items-center gap-1 truncate">
-                        <MapPin size={12} className="text-emerald-500 shrink-0" />
-                        <span className="truncate">{client.address || 'Address N/A'}</span>
+            {filteredClients.map((client) => {
+              const deal = dealsMap[client.id]
+              const dealVal = deal ? Number(deal.deal_value) || 0 : 35000
+              const advanceVal = deal ? Number(deal.advance_paid) || 0 : 17500
+              const balanceVal = Math.max(0, dealVal - advanceVal)
+              const symbol = deal?.currency === 'USD' ? '$' : '₹'
+              const service = deal?.service_type || 'Custom Website + WhatsApp Booking Funnel'
+              const stage = deal?.stage || 'closing'
+              const deadline = deal?.target_deadline || '14 Days'
+
+              const stageColors: Record<string, string> = {
+                closing: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300',
+                in_development: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300',
+                review: 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300',
+                delivered: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300',
+                maintenance: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-300',
+              }
+
+              return (
+                <div
+                  key={client.id}
+                  className="rounded-3xl bg-white dark:bg-stone-900 border-2 border-slate-200 dark:border-stone-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition-all p-5 sm:p-6 space-y-4 shadow-xs flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    {/* Top Row: Business Name & Stage Badge */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight line-clamp-1">
+                          {client.business_name}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium">
+                          {client.owner_name || 'Client Lead'} • {client.phone}
+                        </p>
+                      </div>
+
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border shrink-0 ${stageColors[stage] || stageColors.closing}`}>
+                        {stage.replace('_', ' ')}
+                      </span>
+                    </div>
+
+                    {/* Deliverable Box */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-stone-800/50 border border-slate-200 dark:border-stone-700/60 space-y-1">
+                      <span className="text-[10px] font-extrabold uppercase text-indigo-600 dark:text-indigo-400 block tracking-wider">
+                        Project Deliverable:
+                      </span>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-2">
+                        {service}
                       </p>
                     </div>
-                    <span className="badge badge-good text-[10px] shrink-0 font-bold uppercase">
-                      Won Client
-                    </span>
+
+                    {/* Financial Numbers Row */}
+                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                      <div className="p-2 rounded-xl bg-slate-100 dark:bg-stone-800">
+                        <span className="text-[10px] font-bold text-slate-500 block">Deal Value</span>
+                        <span className="text-xs font-black font-mono text-slate-900 dark:text-white">
+                          {symbol}{dealVal.toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                        <span className="text-[10px] font-bold text-emerald-600 block">Advance</span>
+                        <span className="text-xs font-black font-mono text-emerald-700 dark:text-emerald-300">
+                          {symbol}{advanceVal.toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40">
+                        <span className="text-[10px] font-bold text-amber-600 block">Balance</span>
+                        <span className="text-xs font-black font-mono text-amber-700 dark:text-amber-300">
+                          {symbol}{balanceVal.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2 my-4 pt-3 border-t border-[var(--line)] text-xs">
-                    <div className="flex items-center gap-2 text-[var(--foreground)] font-mono">
-                      <Phone size={13} className="text-emerald-500" />
-                      <span>{client.phone}</span>
+                  {/* Operational Action Buttons */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-stone-800">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setAgreementModalClient(client)}
+                        className="btn btn-secondary py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-purple-700 dark:text-purple-300 cursor-pointer hover:bg-purple-50"
+                        title="Generate Legal Agreement"
+                      >
+                        <ShieldCheck size={13} />
+                        <span>AI Contract</span>
+                      </button>
+
+                      <button
+                        onClick={() => setInvoiceModalClient(client)}
+                        className="btn btn-secondary py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-emerald-700 dark:text-emerald-300 cursor-pointer hover:bg-emerald-50"
+                        title="Generate Milestone Invoice"
+                      >
+                        <Receipt size={13} />
+                        <span>Milestone Bill</span>
+                      </button>
                     </div>
 
-                    {client.owner_name && (
-                      <div className="flex items-center gap-2 text-[var(--ink-muted)]">
-                        <CheckCircle2 size={13} className="text-emerald-500" />
-                        <span>POC: <strong>{client.owner_name}</strong></span>
-                      </div>
-                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setDealModalClient(client)}
+                        className="btn btn-secondary py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-indigo-700 dark:text-indigo-300 cursor-pointer"
+                        title="Edit Deal Value, Advance & Scope"
+                      >
+                        <Briefcase size={13} />
+                        <span>Deal Dossier</span>
+                      </button>
 
-                    {client.website_url && (
-                      <div className="flex items-center gap-2 text-[var(--ink-muted)] truncate">
-                        <Globe size={13} className="text-indigo-500 shrink-0" />
-                        <a
-                          href={client.website_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-indigo-600 dark:text-indigo-400 hover:underline truncate"
-                        >
-                          {client.website_url}
-                        </a>
-                      </div>
-                    )}
+                      <button
+                        onClick={() => setSelectedClient(client)}
+                        className="btn btn-secondary py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-300 cursor-pointer"
+                        title="Inspect Full Lead Details & Audit"
+                      >
+                        <FileText size={13} />
+                        <span>Lead Audit</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="pt-3 border-t border-[var(--line)] flex justify-between items-center">
-                  <div className="text-xs text-[var(--ink-muted)]">
-                    Score: <span className="font-bold text-purple-600 dark:text-purple-400">{client.score || 85}/100</span>
-                  </div>
-                  <button
-                    onClick={() => setSelectedClient(client)}
-                    className="btn btn-sm btn-secondary rounded-xl text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:border-emerald-300"
-                  >
-                    View Dossier
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

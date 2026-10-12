@@ -5,7 +5,7 @@ import { Save, Key, MessageCircle, User, Shield, CheckCircle2, ShieldCheck } fro
 import Toast, { ToastMessage } from '@/components/Toast'
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'profile' | 'api' | 'whatsapp'>('api')
+  const [activeTab, setActiveTab] = useState<'profile' | 'api' | 'whatsapp' | 'security'>('api')
   const [toast, setToast] = useState<ToastMessage | null>(null)
   
   // State for settings
@@ -21,12 +21,23 @@ export default function SettingsPage() {
     accessToken: 'EAAa8ZCNHKZAnoB...'
   })
 
+  // Admin PIN Gate State
+  const [pinEnabled, setPinEnabled] = useState(false)
+  const [adminPin, setAdminPin] = useState('1234')
+
+  React.useEffect(() => {
+    setPinEnabled(localStorage.getItem('synchad_admin_pin_enabled') === 'true')
+    setAdminPin(localStorage.getItem('synchad_admin_pin') || '1234')
+  }, [])
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
+    localStorage.setItem('synchad_admin_pin_enabled', String(pinEnabled))
+    localStorage.setItem('synchad_admin_pin', adminPin)
     setToast({
       id: String(Date.now()),
       title: 'Settings Saved',
-      description: 'Your configuration has been updated successfully.',
+      description: 'Your configuration and security credentials have been updated.',
       type: 'success'
     })
   }
@@ -57,6 +68,7 @@ export default function SettingsPage() {
             { key: 'api', label: 'API Integrations', icon: Key },
             { key: 'whatsapp', label: 'WhatsApp Config', icon: MessageCircle },
             { key: 'profile', label: 'Agency Profile', icon: User },
+            { key: 'security', label: 'Admin Security PIN', icon: Shield },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -128,7 +140,7 @@ export default function SettingsPage() {
                     {/* Gemini */}
                     <div className="p-4 bg-[var(--surface-alt)] rounded-2xl border border-[var(--line)] space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-[var(--foreground)]">Gemini 3.8 Flash API Key</label>
+                        <label className="text-xs font-bold text-[var(--foreground)]">Google Gemini 2.5 Flash API Key</label>
                         <span className="badge badge-good text-[10px]">
                           <CheckCircle2 size={11} /> Connected & Active
                         </span>
@@ -259,6 +271,57 @@ export default function SettingsPage() {
                         defaultValue="admin@leadgencrm.io"
                         className="form-input text-xs"
                       />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: ADMIN SECURITY PIN */}
+              {activeTab === 'security' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div>
+                    <h3 className="text-base font-extrabold text-[var(--foreground)]">Admin Security PIN Gate</h3>
+                    <p className="text-xs text-[var(--ink-muted)] mt-0.5">
+                      Protect your private client leads, phone numbers, and WhatsApp settings from unauthorized visitors on the public URL.
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-[var(--surface-alt)] border border-[var(--line)] space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-bold text-[var(--foreground)] block">
+                          Enable Master PIN Protection
+                        </span>
+                        <span className="text-xs text-[var(--ink-muted)]">
+                          When turned on, a 4-digit PIN gate is required to access the CRM on any new device or session.
+                        </span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={pinEnabled}
+                          onChange={(e) => setPinEnabled(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 dark:bg-stone-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+
+                    <div className="pt-3 border-t border-[var(--line)] space-y-2">
+                      <label className="text-xs font-bold text-[var(--foreground)] block">
+                        Master Security PIN (4 to 8 Digits)
+                      </label>
+                      <input
+                        type="password"
+                        maxLength={8}
+                        value={adminPin}
+                        onChange={(e) => setAdminPin(e.target.value)}
+                        placeholder="1234"
+                        className="form-input text-base font-mono tracking-widest font-black max-w-xs"
+                      />
+                      <p className="text-[11px] text-[var(--ink-muted)]">
+                        Default PIN is <code>1234</code>. Make sure to remember your PIN before locking.
+                      </p>
                     </div>
                   </div>
                 </div>
