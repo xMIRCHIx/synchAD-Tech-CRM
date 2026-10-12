@@ -320,6 +320,30 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
     }
   }
 
+  async function handleDeleteLead(id: string, name: string) {
+    if (!confirm(`Are you sure you want to remove "${name}" from this campaign?`)) return
+    const prev = leads
+    setLeads((l) => l.filter((lead) => lead.id !== id))
+    try {
+      const res = await fetch(`/api/leads?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete lead')
+      setToast({
+        id: Date.now().toString(),
+        title: 'Lead Removed',
+        description: `Removed "${name}" from campaign leads.`,
+        type: 'success',
+      })
+    } catch (err: any) {
+      setLeads(prev)
+      setToast({
+        id: Date.now().toString(),
+        title: 'Delete Failed',
+        description: err.message || 'Could not delete lead',
+        type: 'error',
+      })
+    }
+  }
+
   const wonCount = leads.filter(l => l.status === 'won').length
   const enrichedCount = leads.filter(l => l.status === 'enriched' || l.website_audits).length
   const sentCount = leads.filter(l => l.status === 'sent' || l.status === 'delivered' || l.status === 'replied').length
@@ -946,6 +970,17 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
                               className="btn btn-sm btn-primary rounded-xl px-3.5 py-1.5 text-xs font-bold"
                             >
                               Pitch <Send size={11} />
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteLead(lead.id, lead.business_name)
+                              }}
+                              className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-stone-800 border border-slate-200 dark:border-stone-700 flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Delete lead from campaign"
+                            >
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </td>
