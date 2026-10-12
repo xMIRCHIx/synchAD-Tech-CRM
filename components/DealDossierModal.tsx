@@ -26,12 +26,18 @@ export default function DealDossierModal({
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('upi')
   const [serviceType, setServiceType] = useState('Custom Website + WhatsApp Booking Funnel')
   const [projectScope, setProjectScope] = useState('Responsive modern website, mobile speed optimization, and 1-tap WhatsApp booking flow.')
-  const [targetDeadline, setTargetDeadline] = useState(
-    new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
-  )
+  const [targetDeadline, setTargetDeadline] = useState('')
   const [stage, setStage] = useState<DealStage>('closing')
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!targetDeadline) {
+      const d = new Date()
+      d.setDate(d.getDate() + 14)
+      setTargetDeadline(d.toISOString().split('T')[0])
+    }
+  }, [targetDeadline])
 
   useEffect(() => {
     if (isOpen && lead) {

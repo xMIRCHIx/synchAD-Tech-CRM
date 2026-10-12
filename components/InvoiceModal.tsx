@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   X, Printer, Copy, Check, MessageSquare, Receipt,
   Plus, Trash2, ArrowRight, DollarSign, Calendar
@@ -32,14 +32,24 @@ export default function InvoiceModal({
   const symbol = currency === 'INR' ? '₹' : '$'
   const clientName = lead.owner_name || lead.business_name
 
-  const [invoiceNumber] = useState(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0])
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0])
+  const [invoiceNumber, setInvoiceNumber] = useState('INV-2026-1001')
+  const [issueDate, setIssueDate] = useState('2026-10-12')
+  const [dueDate, setDueDate] = useState('2026-10-19')
   const [installmentLabel, setInstallmentLabel] = useState('50% Mobilization Deposit / Advance')
   const [amount, setAmount] = useState<number>(dealData?.advance_paid || 17500)
   const [notes, setNotes] = useState('Payment Due upon receipt. Thank you for partnering with SynchAD Tech!')
   const [copied, setCopied] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      const now = new Date()
+      setInvoiceNumber(`INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)
+      setIssueDate(now.toISOString().split('T')[0])
+      const due = new Date(now.getTime() + 7 * 86400000)
+      setDueDate(due.toISOString().split('T')[0])
+    }
+  }, [isOpen])
 
   async function handleSaveInvoice() {
     try {
