@@ -29,7 +29,8 @@ export default function InboxPage() {
   const [showDossier, setShowDossier] = useState(false)
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
-  const [tokenStatus, setTokenStatus] = useState<'live' | 'expired' | 'loading' | null>(null)
+  const [tokenStatus, setTokenStatus] = useState<'live' | 'expired' | 'blocked' | 'loading' | null>(null)
+  const [tokenErrorMessage, setTokenErrorMessage] = useState<string>('')
 
   // Direct chat modal state
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false)
@@ -72,7 +73,15 @@ export default function InboxPage() {
     try {
       const res = await fetch('/api/whatsapp/profile', { cache: 'no-store' })
       const data = await res.json()
-      setTokenStatus(data.metaStatus?.status === 'live' ? 'live' : 'expired')
+      if (data.metaStatus?.status === 'live') {
+        setTokenStatus('live')
+      } else if (data.metaStatus?.status === 'api_blocked') {
+        setTokenStatus('blocked')
+        setTokenErrorMessage(data.metaStatus?.message || 'Meta API Access Blocked (Code 200).')
+      } else {
+        setTokenStatus('expired')
+        setTokenErrorMessage(data.metaStatus?.message || 'Meta Access Token Expired.')
+      }
     } catch {
       setTokenStatus('expired')
     }
@@ -578,6 +587,38 @@ export default function InboxPage() {
     <div className="h-[calc(100vh-4.25rem)] flex flex-col bg-slate-50 dark:bg-[#0c1317] p-2.5 sm:p-4 overflow-hidden animate-fade-in font-sans">
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
+      {/* API Blocked Warning Banner (Security Checkpoint / Account Action Required) */}
+      {tokenStatus === 'blocked' && (
+        <div className="mb-2 px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-900 dark:text-rose-200 flex flex-wrap items-center justify-between gap-2 shrink-0 animate-fade-in">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle size={16} className="text-rose-500 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-bold">⚠️ Meta API Access Blocked (OAuth Code 200) — Action Required on Meta!</p>
+              <p className="text-[11px] opacity-90">
+                Meta has temporarily restricted API calls for a security checkpoint, 2FA verification, or Developer Terms review. Open Meta Developers or generate a new System User token in Business Settings.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="https://developers.facebook.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-black px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <span>🔓 Open Meta Developers</span>
+              <ArrowUpRight size={11} />
+            </a>
+            <Link
+              href="/whatsapp-profile"
+              className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/20 dark:bg-stone-800 hover:bg-white/30 text-slate-800 dark:text-slate-200 transition-colors"
+            >
+              Update Token
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Token Expired Warning Banner */}
       {tokenStatus === 'expired' && (
         <div className="mb-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 flex flex-wrap items-center justify-between gap-2 shrink-0 animate-fade-in">
@@ -615,7 +656,13 @@ export default function InboxPage() {
               <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-0.5 ${
                 tokenStatus === 'live' ? 'bg-white/20 text-white' : 'bg-amber-500/30 text-amber-200'
               }`}>
-                {tokenStatus === 'live' ? <><ShieldCheck size={10} /> Meta Live</> : <><AlertTriangle size={10} /> Token Expired</>}
+                {tokenStatus === 'live' ? (
+                  <><ShieldCheck size={10} /> Meta Live</>
+                ) : tokenStatus === 'blocked' ? (
+                  <><AlertTriangle size={10} /> API Blocked (Code 200)</>
+                ) : (
+                  <><AlertTriangle size={10} /> Token Expired</>
+                )}
               </span>
             </div>
           </div>

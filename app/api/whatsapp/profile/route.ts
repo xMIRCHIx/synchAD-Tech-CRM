@@ -153,12 +153,15 @@ export async function GET() {
         writeLocalProfile(profile)
       } else {
         const errMsg = metaData.error?.message || 'Meta API returned an error'
+        const isBlocked = errMsg.toLowerCase().includes('blocked') || metaData.error?.code === 200
         const isExpired = errMsg.toLowerCase().includes('expired') || metaData.error?.code === 190
         metaStatus = {
           connected: false,
           token_configured: true,
-          status: isExpired ? 'token_expired' : 'error',
-          message: isExpired
+          status: isBlocked ? 'api_blocked' : isExpired ? 'token_expired' : 'error',
+          message: isBlocked
+            ? 'Meta API Access Blocked (Code 200) — Meta requires a security checkpoint or policy confirmation on your account. Open developers.facebook.com or business.facebook.com to resolve.'
+            : isExpired
             ? 'Meta Access Token has expired (24h temporary token). Generate a fresh token in Meta Developer Portal or set a Permanent System User Token.'
             : errMsg,
         }
