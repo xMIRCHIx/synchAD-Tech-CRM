@@ -20,7 +20,8 @@ import {
   Compass,
   UserPlus,
   Receipt,
-  FileText
+  FileText,
+  Briefcase
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/leads', icon: Users, label: 'Leads Pipeline' },
   { href: '/custom-leads', icon: UserPlus, label: 'Custom Leads' },
   { href: '/clients', icon: PartyPopper, label: 'Won Clients' },
+  { href: '/deals', icon: Briefcase, label: 'Deals & Scope' },
   { href: '/invoices', icon: Receipt, label: 'Invoices' },
   { href: '/agreements', icon: FileText, label: 'Agreements' },
   { href: '/inbox', icon: MessageSquare, label: 'WhatsApp Inbox' },

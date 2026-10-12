@@ -116,9 +116,19 @@ export interface WaTemplate {
 export type DealStage = 'closing' | 'in_development' | 'review' | 'delivered' | 'maintenance'
 export type PaymentMode = 'upi' | 'bank_transfer' | 'cash' | 'stripe'
 
+export interface DealInstallment {
+  id: string
+  label: string
+  amount: number
+  due_date: string
+  status: 'paid' | 'pending'
+}
+
 export interface ClientDeal {
   id?: string
   lead_id: string
+  client_name?: string
+  client_phone?: string
   deal_value: number
   advance_paid: number
   balance_due: number
@@ -126,6 +136,8 @@ export interface ClientDeal {
   payment_mode: PaymentMode
   service_type: string
   project_scope: string
+  features?: string[]
+  installments?: DealInstallment[]
   target_deadline?: string | null
   stage: DealStage
   created_at?: string

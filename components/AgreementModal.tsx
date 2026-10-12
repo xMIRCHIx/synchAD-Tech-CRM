@@ -54,6 +54,7 @@ export default function AgreementModal({
 
   // Client info
   const [clientMode, setClientMode] = useState<'existing' | 'custom'>(lead ? 'existing' : 'custom')
+  const [clientCategoryTab, setClientCategoryTab] = useState<'won' | 'all'>('won')
   const [selectedLeadId, setSelectedLeadId] = useState<string>(lead?.id || '')
   const [clientName, setClientName] = useState('')
   const [businessName, setBusinessName] = useState('')
@@ -117,6 +118,29 @@ export default function AgreementModal({
       }
     }
   }, [initialAgreement, lead, selectedLeadId, leads])
+
+  // Auto-fetch deal data when lead is picked
+  useEffect(() => {
+    if (selectedLeadId && !initialAgreement) {
+      fetch(`/api/clients/deal?leadId=${selectedLeadId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.deal) {
+            const d = data.deal
+            if (d.deal_value) setDealVal(Number(d.deal_value))
+            if (d.advance_paid) setAdvanceVal(Number(d.advance_paid))
+            if (d.service_type) setService(d.service_type)
+            if (d.target_deadline) setDeadline(d.target_deadline)
+            if (d.features && Array.isArray(d.features) && d.features.length > 0) {
+              setScope(`${d.service_type || 'Software Development'}\n\nFeatures Included:\n${d.features.map((f: string) => `• ${f}`).join('\n')}\n\n${d.project_scope || ''}`)
+            } else if (d.project_scope) {
+              setScope(d.project_scope)
+            }
+          }
+        })
+        .catch(() => {})
+    }
+  }, [selectedLeadId, initialAgreement])
 
   useEffect(() => {
     if (isOpen) {
@@ -355,18 +379,41 @@ Please confirm acceptance so we can commence development immediately!`
             </div>
 
             {clientMode === 'existing' ? (
-              <select
-                value={selectedLeadId}
-                onChange={e => setSelectedLeadId(e.target.value)}
-                className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 font-bold"
-              >
-                <option value="">-- Choose Existing Lead --</option>
-                {leads.map(l => (
-                  <option key={l.id} value={l.id}>
-                    {l.business_name} ({l.phone})
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex rounded-lg bg-slate-200 dark:bg-stone-800 p-0.5 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setClientCategoryTab('won')}
+                    className={`px-2 py-0.5 rounded-md cursor-pointer ${
+                      clientCategoryTab === 'won' ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    Won Clients ({leads.filter(l => l.status === 'won').length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClientCategoryTab('all')}
+                    className={`px-2 py-0.5 rounded-md cursor-pointer ${
+                      clientCategoryTab === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    All Leads ({leads.length})
+                  </button>
+                </div>
+
+                <select
+                  value={selectedLeadId}
+                  onChange={e => setSelectedLeadId(e.target.value)}
+                  className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 font-bold cursor-pointer"
+                >
+                  <option value="">-- Choose {clientCategoryTab === 'won' ? 'Won Client' : 'Lead'} --</option>
+                  {(clientCategoryTab === 'won' ? leads.filter(l => l.status === 'won') : leads).map(l => (
+                    <option key={l.id} value={l.id}>
+                      {l.business_name} ({l.phone}) {l.status === 'won' ? '★ WON' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2 flex-1">
                 <input

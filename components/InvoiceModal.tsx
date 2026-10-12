@@ -63,6 +63,7 @@ export default function InvoiceModal({
 
   // Client Selection
   const [clientMode, setClientMode] = useState<'existing' | 'custom'>(lead ? 'existing' : 'custom')
+  const [clientCategoryTab, setClientCategoryTab] = useState<'won' | 'all'>('won')
   const [selectedLeadId, setSelectedLeadId] = useState<string>(lead?.id || '')
   const [clientName, setClientName] = useState('')
   const [clientPhone, setClientPhone] = useState('')
@@ -131,6 +132,48 @@ export default function InvoiceModal({
       }
     }
   }, [initialInvoice, lead, selectedLeadId, leads])
+
+  // Automatically fetch deal data & features when lead is picked
+  useEffect(() => {
+    if (selectedLeadId && !initialInvoice) {
+      fetch(`/api/clients/deal?leadId=${selectedLeadId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.deal) {
+            const d = data.deal
+            if (d.target_deadline) setDueDate(d.target_deadline)
+            const amountToBill = Number(d.advance_paid || d.deal_value) || 17500
+            if (d.features && Array.isArray(d.features) && d.features.length > 0) {
+              setItems([
+                {
+                  id: 'item-1',
+                  description: d.service_type || 'Custom Website & Software Development',
+                  details: `Agreed Deliverables: ${d.features.join(', ')}`,
+                  quantity: 1,
+                  rate: amountToBill,
+                  amount: amountToBill
+                }
+              ])
+            } else if (d.advance_paid) {
+              setItems([
+                {
+                  id: 'item-1',
+                  description: d.service_type || 'Software & Tech Services',
+                  details: d.project_scope || 'Development milestones & booking advance.',
+                  quantity: 1,
+                  rate: amountToBill,
+                  amount: amountToBill
+                }
+              ])
+            }
+            if (d.project_scope) {
+              setNotes(`Scope: ${d.project_scope}`)
+            }
+          }
+        })
+        .catch(() => {})
+    }
+  }, [selectedLeadId, initialInvoice])
 
   // Set invoice details on open
   useEffect(() => {
@@ -424,17 +467,40 @@ Thank you for choosing ${agency.name}!`
               </div>
 
               {!lead && clientMode === 'existing' ? (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400">Pick CRM Lead:</label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-bold">
+                    <span className="text-slate-400">Client Category:</span>
+                    <div className="flex rounded-md bg-slate-800 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setClientCategoryTab('won')}
+                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          clientCategoryTab === 'won' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Won Clients ({leads.filter(l => l.status === 'won').length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClientCategoryTab('all')}
+                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          clientCategoryTab === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        All Leads ({leads.length})
+                      </button>
+                    </div>
+                  </div>
+
                   <select
                     value={selectedLeadId}
                     onChange={e => setSelectedLeadId(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 text-white text-xs font-semibold outline-none"
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 text-white text-xs font-semibold outline-none cursor-pointer"
                   >
-                    <option value="">-- Choose Lead --</option>
-                    {leads.map(l => (
+                    <option value="">-- Choose {clientCategoryTab === 'won' ? 'Won Client' : 'Lead'} --</option>
+                    {(clientCategoryTab === 'won' ? leads.filter(l => l.status === 'won') : leads).map(l => (
                       <option key={l.id} value={l.id}>
-                        {l.business_name} ({l.phone})
+                        {l.business_name} ({l.phone}) {l.status === 'won' ? '★ WON' : ''}
                       </option>
                     ))}
                   </select>

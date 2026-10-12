@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { Lead, LeadStatus, ClientDeal } from '@/lib/types'
 import {
   Search, RefreshCw, CheckCircle2, Phone, MapPin, Mail, ShieldCheck, Globe,
@@ -140,6 +141,14 @@ export default function ClientsDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              href="/deals"
+              className="btn btn-primary px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white cursor-pointer"
+            >
+              <Briefcase size={14} />
+              <span>Deals & Scope Studio</span>
+            </Link>
+
             <button
               onClick={() => refreshAll(false)}
               disabled={isRefreshing}
@@ -347,14 +356,14 @@ export default function ClientsDashboard() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setDealModalClient(client)}
-                        className="btn btn-secondary py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-indigo-700 dark:text-indigo-300 cursor-pointer"
-                        title="Edit Deal Value, Advance & Scope"
+                      <Link
+                        href={`/deals?leadId=${client.id}`}
+                        className="btn btn-secondary py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-indigo-700 dark:text-indigo-300 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                        title="Open Full Deal & Project Scope Studio"
                       >
                         <Briefcase size={13} />
-                        <span>Deal Dossier</span>
-                      </button>
+                        <span>Scope Studio</span>
+                      </Link>
 
                       <button
                         onClick={() => setSelectedClient(client)}
