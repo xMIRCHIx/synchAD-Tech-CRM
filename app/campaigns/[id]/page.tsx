@@ -23,7 +23,7 @@ function parseNiche(rawNiche?: string | null) {
   return { cleanNiche, websiteTypes: types }
 }
 
-function getStatusBadgeStyle(status: LeadStatus) {
+function getStatusBadgeStyle(status: LeadStatus | string) {
   switch (status) {
     case 'won':
       return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700'
@@ -37,9 +37,12 @@ function getStatusBadgeStyle(status: LeadStatus) {
     case 'review':
     case 'new':
       return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-700'
-    case 'lost':
+    case 'not_responded':
     case 'skipped':
-      return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-700'
+      return 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-950/80 dark:text-orange-300 dark:border-orange-700'
+    case 'rejected':
+    case 'lost':
+      return 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-700'
     default:
       return 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700'
   }
@@ -336,6 +339,10 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
           ? true
           : statusFilter === 'review'
           ? l.status === 'review' || l.status === 'new'
+          : statusFilter === 'not_responded'
+          ? l.status === 'not_responded' || l.status === 'skipped'
+          : statusFilter === 'rejected'
+          ? l.status === 'rejected' || l.status === 'lost'
           : l.status === statusFilter
 
       const matchesSite =
@@ -698,7 +705,10 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
                 <option value="review">Stage: Review / New</option>
                 <option value="queued">Stage: Queued</option>
                 <option value="sent">Stage: Sent</option>
+                <option value="replied">Stage: Replied</option>
                 <option value="won">Stage: Won</option>
+                <option value="not_responded">Stage: Not Responded</option>
+                <option value="rejected">Stage: Rejected</option>
               </select>
             </div>
 
@@ -895,7 +905,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
                         <td onClick={(e) => e.stopPropagation()}>
                           <div className="relative inline-flex items-center">
                             <select
-                              value={lead.status}
+                              value={lead.status === 'skipped' ? 'not_responded' : lead.status === 'lost' ? 'rejected' : lead.status}
                               onChange={(e) => {
                                 e.stopPropagation()
                                 handleUpdateStatus(lead.id, e.target.value as LeadStatus)
@@ -910,8 +920,8 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
                               <option value="delivered" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Delivered</option>
                               <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Replied</option>
                               <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Won 🏆</option>
-                              <option value="lost" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Lost</option>
-                              <option value="skipped" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Skipped</option>
+                              <option value="not_responded" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Not Responded 📵</option>
+                              <option value="rejected" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Rejected ❌</option>
                             </select>
                             <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[8px] opacity-60">
                               ▼

@@ -13,6 +13,8 @@ export type LeadStatus =
   | 'won'
   | 'lost'
   | 'skipped'
+  | 'not_responded'
+  | 'rejected'
 
 export type SiteState = 'exists' | 'none' | 'broken' | 'unknown'
 export type MessageDirection = 'inbound' | 'outbound'

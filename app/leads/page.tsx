@@ -23,6 +23,8 @@ const PIPELINE_STATUSES: { key: LeadStatus | 'all'; label: string; color: string
   { key: 'sent', label: 'Sent', color: 'bg-blue-100 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border border-blue-300' },
   { key: 'replied', label: 'Replied', color: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300' },
   { key: 'won', label: 'Won', color: 'bg-teal-100 dark:bg-teal-950/60 text-teal-900 dark:text-teal-200 border border-teal-300' },
+  { key: 'not_responded', label: 'Not Responded', color: 'bg-orange-100 dark:bg-orange-950/60 text-orange-900 dark:text-orange-200 border border-orange-300' },
+  { key: 'rejected', label: 'Rejected', color: 'bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 border border-rose-300' },
 ]
 
 export default function LeadsDashboard() {
@@ -747,7 +749,7 @@ export default function LeadsDashboard() {
                         {/* Stage Selector */}
                         <td onClick={(e) => e.stopPropagation()}>
                           <select
-                            value={lead.status}
+                            value={lead.status === 'skipped' ? 'not_responded' : lead.status === 'lost' ? 'rejected' : lead.status}
                             onChange={(e) => handleUpdateStatus(lead.id, e.target.value as LeadStatus)}
                             className="text-[11px] font-black uppercase px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-700 text-slate-900 dark:text-white outline-none cursor-pointer shadow-2xs"
                           >
@@ -756,6 +758,8 @@ export default function LeadsDashboard() {
                             <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sent</option>
                             <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Replied</option>
                             <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Won</option>
+                            <option value="not_responded" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Not Responded</option>
+                            <option value="rejected" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Rejected</option>
                           </select>
                         </td>
 

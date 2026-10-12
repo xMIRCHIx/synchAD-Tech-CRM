@@ -68,7 +68,8 @@ export async function POST(request: Request) {
     const validStatuses = [
       'new', 'enriched', 'review', 'queued',
       'sent', 'delivered', 'read',
-      'replied', 'won', 'lost', 'skipped'
+      'replied', 'won', 'lost', 'skipped',
+      'not_responded', 'rejected'
     ];
 
     const leadsToInsert = rawItems.map((item: any) => {
@@ -145,12 +146,29 @@ export async function PATCH(request: Request) {
     if (status) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("leads")
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+
+    // If check constraint fails because DB hasn't been migrated with new enum values yet, fallback smoothly
+    if (error && error.message?.includes('leads_status_check')) {
+      if (status === 'rejected') {
+        updateData.status = 'lost';
+      } else if (status === 'not_responded') {
+        updateData.status = 'skipped';
+      }
+      const retry = await supabase
+        .from("leads")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });

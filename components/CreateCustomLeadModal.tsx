@@ -249,6 +249,8 @@ export default function CreateCustomLeadModal({
                 <option value="sent">Already Pitched (Sent)</option>
                 <option value="replied">Replied (Active Talk)</option>
                 <option value="won">Won Client</option>
+                <option value="not_responded">Not Responded</option>
+                <option value="rejected">Rejected</option>
               </select>
             </div>
           </div>

@@ -639,7 +639,7 @@ export default function CustomLeadsPage() {
                       {/* Stage Selector */}
                       <td onClick={(e) => e.stopPropagation()}>
                         <select
-                          value={lead.status}
+                          value={lead.status === 'skipped' ? 'not_responded' : lead.status === 'lost' ? 'rejected' : lead.status}
                           onChange={(e) => handleUpdateStatus(lead.id, e.target.value as LeadStatus)}
                           className="text-[11px] font-black uppercase px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-700 text-slate-900 dark:text-white outline-none cursor-pointer shadow-2xs"
                         >
@@ -648,6 +648,8 @@ export default function CustomLeadsPage() {
                           <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sent</option>
                           <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Replied</option>
                           <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Won</option>
+                          <option value="not_responded" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Not Responded</option>
+                          <option value="rejected" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Rejected</option>
                         </select>
                       </td>
 
