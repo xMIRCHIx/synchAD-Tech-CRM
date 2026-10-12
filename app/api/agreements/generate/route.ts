@@ -18,7 +18,12 @@ export async function POST(req: Request) {
       currency = 'INR',
       serviceType = 'Custom Website + WhatsApp Booking Funnel',
       projectScope = 'Design, build, mobile optimization, and WhatsApp instant booking engine.',
-      targetDeadline
+      targetDeadline,
+      partner1Name = 'Aryan Gupta',
+      partner1Role = 'Co-Founder & Technical Lead',
+      partner2Name = 'Harsh Vardhan',
+      partner2Role = 'Co-Founder & Operations Lead',
+      hasDualPartners = true
     } = body
 
     const todayStr = new Date().toLocaleDateString('en-IN', {
@@ -29,6 +34,12 @@ export async function POST(req: Request) {
     const agrCode = `SYNCH-AGR-${Math.floor(1000 + Math.random() * 9000)}`
     const symbol = currency === 'INR' ? '₹' : '$'
 
+    const partnerSectionPrompt = hasDualPartners
+      ? `- Authorized Signatories (Agency): 
+          1. Partner 1: "${partner1Name}" (${partner1Role})
+          2. Partner 2: "${partner2Name}" (${partner2Role})`
+      : `- Authorized Signatory (Agency): "${partner1Name}" (${partner1Role})`
+
     const prompt = `You are a high-level corporate legal counsel specializing in B2B technology agreements.
 Draft a professional, ironclad, and balanced "Software & Web Development Service Agreement" for SynchAD Tech.
 
@@ -36,6 +47,7 @@ Contract Specifics:
 - Agreement Number: ${agrCode}
 - Effective Date: ${todayStr}
 - Service Provider: SynchAD Tech ("Developer / Agency")
+${partnerSectionPrompt}
 - Client Business: "${businessName || 'Client'}"
 - Authorized Representative / Client Name: "${clientName || businessName || 'Client Representative'}"
 - Client Phone: "${phone || 'Listed on file'}"
@@ -57,7 +69,7 @@ Structure of the Agreement:
 7. WARRANTY, POST-LAUNCH SUPPORT & BUG FIXES: 30 days of complimentary technical warranty support post-deployment.
 8. CONFIDENTIALITY & NON-DISCLOSURE: Strict mutual confidentiality.
 9. GOVERNING LAW & DISPUTE RESOLUTION: Standard commercial arbitration.
-10. EXECUTION & SIGNATURES: Clear dual-signature block for SynchAD Tech and Client.
+10. EXECUTION & SIGNATURES: Clear dual-signature block for SynchAD Tech (Partners) and Client.
 
 Format your output in clean, elegant Markdown. Use bold headings, bullet points, and clean typography suitable for official document printing. Do not include markdown code block backticks (like \`\`\`markdown). Output the raw formatted text directly.`
 
@@ -139,13 +151,19 @@ SynchAD Tech provides a **30-day technical bug-fix warranty** post-deployment at
 
 ### 6. SIGNATURES & ACCEPTANCE
 
-**For SynchAD Tech (Agency):**  
-Authorized Signatory: _________________________  
+**For SynchAD Tech (Partner 1):**  
+Name: ${partner1Name} (${partner1Role})  
+Signature: _________________________  
 Date: ${todayStr}  
 
+${hasDualPartners ? `**For SynchAD Tech (Partner 2):**  
+Name: ${partner2Name} (${partner2Role})  
+Signature: _________________________  
+Date: ${todayStr}  
+` : ''}
 **For ${businessName || 'Client'} (Client):**  
-Authorized Signatory: _________________________  
 Name: ${clientName || 'Authorized Signatory'}  
+Signature: _________________________  
 Date: ${todayStr}
 `
     }

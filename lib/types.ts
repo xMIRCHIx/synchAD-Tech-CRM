@@ -191,6 +191,10 @@ export interface ClientInvoice {
 export interface AgencyProfile {
   name: string
   representative: string
+  partner1_role?: string
+  partner2_name?: string
+  partner2_role?: string
+  has_dual_signatories?: boolean
   email: string
   phone: string
   address: string

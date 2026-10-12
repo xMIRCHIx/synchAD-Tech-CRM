@@ -329,9 +329,9 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* General Agency Info */}
+                  {/* General Agency Info & Partnership Signatories */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 sm:col-span-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Agency / Legal Entity Name</label>
                       <input
                         type="text"
@@ -341,14 +341,69 @@ export default function SettingsPage() {
                       />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Authorized Signatory Name</label>
-                      <input
-                        type="text"
-                        value={agencyProfile.representative}
-                        onChange={e => setAgencyProfile({ ...agencyProfile, representative: e.target.value })}
-                        className="form-input text-xs font-bold"
-                      />
+                    {/* Partnership Signatory 1 */}
+                    <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                        Partner 1 (Authorized Signatory)
+                      </span>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[var(--ink-muted)]">Full Name</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.representative}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, representative: e.target.value })}
+                          className="form-input text-xs font-bold"
+                          placeholder="e.g. Aryan Gupta"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[var(--ink-muted)]">Designation / Role</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.partner1_role || ''}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, partner1_role: e.target.value })}
+                          className="form-input text-xs font-medium"
+                          placeholder="e.g. Co-Founder & Tech Director"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Partnership Signatory 2 */}
+                    <div className="p-3.5 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400 block">
+                          Partner 2 (Authorized Signatory)
+                        </span>
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--ink-muted)] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={agencyProfile.has_dual_signatories ?? true}
+                            onChange={e => setAgencyProfile({ ...agencyProfile, has_dual_signatories: e.target.checked })}
+                            className="rounded accent-purple-600"
+                          />
+                          Enable Partner 2
+                        </label>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[var(--ink-muted)]">Full Name</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.partner2_name || ''}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, partner2_name: e.target.value })}
+                          className="form-input text-xs font-bold"
+                          placeholder="e.g. Co-Founder / Business Lead"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[var(--ink-muted)]">Designation / Role</label>
+                        <input
+                          type="text"
+                          value={agencyProfile.partner2_role || ''}
+                          onChange={e => setAgencyProfile({ ...agencyProfile, partner2_role: e.target.value })}
+                          className="form-input text-xs font-medium"
+                          placeholder="e.g. Co-Founder & Managing Partner"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-1.5">

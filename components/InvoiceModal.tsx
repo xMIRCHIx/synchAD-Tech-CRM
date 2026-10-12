@@ -37,6 +37,10 @@ interface LineItem {
 const DEFAULT_AGENCY: AgencyProfile = {
   name: 'SynchAD Tech',
   representative: 'Aryan Gupta',
+  partner1_role: 'Co-Founder & Technical Director',
+  partner2_name: 'Harsh Vardhan',
+  partner2_role: 'Co-Founder & Managing Partner',
+  has_dual_signatories: true,
   email: 'contact@synchadtech.com',
   phone: '+91 70675 49982',
   address: 'Commercial Tower, Sector 62, Noida, UP, India',
@@ -774,6 +778,70 @@ Thank you for choosing ${agency.name}!`
                   />
                 </div>
               </div>
+
+              {/* Dual Partner Signatories Configuration */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-300">Partnership Signatories</span>
+                  <label className="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={agency.has_dual_signatories ?? true}
+                      onChange={e => setAgency({ ...agency, has_dual_signatories: e.target.checked })}
+                      className="rounded accent-indigo-600"
+                    />
+                    Dual Partners
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div>
+                    <span className="text-slate-400 block font-semibold">Partner 1 Name:</span>
+                    <input
+                      type="text"
+                      value={agency.representative || ''}
+                      onChange={e => setAgency({ ...agency, representative: e.target.value })}
+                      placeholder="Partner 1 Name"
+                      className="w-full px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-white text-xs outline-none"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block font-semibold">Partner 1 Role:</span>
+                    <input
+                      type="text"
+                      value={agency.partner1_role || ''}
+                      onChange={e => setAgency({ ...agency, partner1_role: e.target.value })}
+                      placeholder="Co-Founder & Tech Lead"
+                      className="w-full px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-white text-xs outline-none"
+                    />
+                  </div>
+                </div>
+
+                {(agency.has_dual_signatories ?? true) && (
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-slate-400 block font-semibold">Partner 2 Name:</span>
+                      <input
+                        type="text"
+                        value={agency.partner2_name || ''}
+                        onChange={e => setAgency({ ...agency, partner2_name: e.target.value })}
+                        placeholder="Partner 2 Name"
+                        className="w-full px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-white text-xs outline-none"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-semibold">Partner 2 Role:</span>
+                      <input
+                        type="text"
+                        value={agency.partner2_role || ''}
+                        onChange={e => setAgency({ ...agency, partner2_role: e.target.value })}
+                        placeholder="Co-Founder & Business Lead"
+                        className="w-full px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-white text-xs outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
           </div>
@@ -1027,20 +1095,52 @@ Thank you for choosing ${agency.name}!`
                   <strong>Notes & Terms:</strong> {notes}
                 </p>
 
-                <div className="flex justify-between items-end pt-4 text-xs font-semibold">
-                  <div>
-                    <div className="border-b border-slate-400 w-40 mb-1"></div>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">
-                      Customer Signature
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-5 text-xs font-semibold">
+                  {/* Customer / Client Signature */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                      Client Acceptance
+                    </span>
+                    <div className="border-b-2 border-slate-300 w-full pt-6"></div>
+                    <p className="text-xs font-black text-slate-900 truncate">
+                      {clientName || 'Customer Signature'}
+                    </p>
+                    <span className="text-[9px] text-slate-500 font-medium block">
+                      Authorized Client Signatory
                     </span>
                   </div>
 
-                  <div className="text-right">
-                    <div className="border-b border-slate-400 w-40 ml-auto mb-1"></div>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">
-                      For {agency.name} (Authorized)
+                  {/* Partner 1 Signature */}
+                  <div className="space-y-1 sm:text-center">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                      For {agency.name} (Partner 1)
+                    </span>
+                    <div className="border-b-2 border-slate-300 w-full pt-6"></div>
+                    <p className="text-xs font-black text-slate-900 truncate">
+                      {agency.representative || 'Aryan Gupta'}
+                    </p>
+                    <span className="text-[9px] text-indigo-700 font-bold block">
+                      {agency.partner1_role || 'Co-Founder & Technical Lead'}
                     </span>
                   </div>
+
+                  {/* Partner 2 Signature (If enabled) */}
+                  {(agency.has_dual_signatories ?? true) ? (
+                    <div className="space-y-1 sm:text-right">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                        For {agency.name} (Partner 2)
+                      </span>
+                      <div className="border-b-2 border-slate-300 w-full pt-6"></div>
+                      <p className="text-xs font-black text-slate-900 truncate">
+                        {agency.partner2_name || 'Managing Partner'}
+                      </p>
+                      <span className="text-[9px] text-purple-700 font-bold block">
+                        {agency.partner2_role || 'Co-Founder & Business Lead'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="hidden sm:block"></div>
+                  )}
                 </div>
               </div>
 

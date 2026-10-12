@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react'
 import {
   X, Sparkles, Printer, Copy, Check, MessageSquare, ShieldCheck,
-  FileText, Download, Edit3, ArrowRight, RefreshCw, Phone, MapPin, Building
+  FileText, Download, Edit3, ArrowRight, RefreshCw, Phone, MapPin, Building,
+  Upload, Users, CheckSquare, Square
 } from 'lucide-react'
 import type { Lead, ClientAgreement, AgencyProfile } from '@/lib/types'
 import { useData } from '@/context/DataContext'
@@ -28,6 +29,10 @@ interface AgreementModalProps {
 const DEFAULT_AGENCY: AgencyProfile = {
   name: 'SynchAD Tech',
   representative: 'Aryan Gupta',
+  partner1_role: 'Co-Founder & Technical Lead',
+  partner2_name: 'Harsh Vardhan',
+  partner2_role: 'Co-Founder & Operations Lead',
+  has_dual_signatories: true,
   email: 'contact@synchadtech.com',
   phone: '+91 70675 49982',
   address: 'Commercial Tower, Sector 62, Noida, UP, India',
@@ -75,6 +80,31 @@ export default function AgreementModal({
   const [isEditing, setIsEditing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
+  const [showPartnerControls, setShowPartnerControls] = useState(false)
+
+  // Update Agency Profile & persist to LocalStorage
+  function updateAgency(partial: Partial<AgencyProfile>) {
+    setAgency(prev => {
+      const next = { ...prev, ...partial }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('synchad_agency_profile', JSON.stringify(next))
+      }
+      return next
+    })
+  }
+
+  // Logo upload directly inside AgreementModal
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const url = reader.result as string
+        updateAgency({ logo_url: url })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   // Load Agency Profile from LocalStorage & set effective date
   useEffect(() => {
@@ -180,7 +210,12 @@ export default function AgreementModal({
           currency: 'INR',
           serviceType: service,
           projectScope: scope,
-          targetDeadline: deadline
+          targetDeadline: deadline,
+          partner1Name: agency.representative || 'Aryan Gupta',
+          partner1Role: agency.partner1_role || 'Co-Founder & Technical Lead',
+          partner2Name: agency.partner2_name || 'Harsh Vardhan',
+          partner2Role: agency.partner2_role || 'Co-Founder & Operations Lead',
+          hasDualPartners: agency.has_dual_signatories ?? true
         })
       })
 
@@ -199,6 +234,10 @@ export default function AgreementModal({
   async function handleSaveAgreement() {
     if (!agreementText) return
     try {
+      const agencySig = (agency.has_dual_signatories ?? true) && agency.partner2_name
+        ? `${agency.representative} & ${agency.partner2_name} (${agency.name})`
+        : `${agency.representative} (${agency.name})`
+
       const res = await fetch('/api/agreements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -207,7 +246,7 @@ export default function AgreementModal({
           agreementNumber,
           title: `${service} Agreement — ${businessName || clientName}`,
           content: agreementText,
-          agencySignatory: `${agency.name} (${agency.representative})`,
+          agencySignatory: agencySig,
           clientSignatory: clientName || businessName,
           client_name: businessName || clientName,
           client_phone: clientPhone,
@@ -319,6 +358,18 @@ Please confirm acceptance so we can commence development immediately!`
             >
               <Edit3 size={13} />
               {isEditing ? 'Preview Mode' : 'Edit Clauses'}
+            </button>
+
+            <button
+              onClick={() => setShowPartnerControls(!showPartnerControls)}
+              className={`py-2 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-all ${
+                showPartnerControls
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                  : 'btn btn-secondary text-purple-700 dark:text-purple-300'
+              }`}
+            >
+              <Users size={13} />
+              Partners & Signatures
             </button>
 
             <button
@@ -435,40 +486,166 @@ Please confirm acceptance so we can commence development immediately!`
           </div>
         )}
 
+        {/* Quick Partner & Logo Settings Panel */}
+        {showPartnerControls && (
+          <div className="p-4 sm:px-6 bg-purple-50/60 dark:bg-purple-950/20 border-b border-purple-200 dark:border-purple-900/40 space-y-3 text-xs print:hidden animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5 text-xs">
+                <Users size={14} className="text-purple-600" />
+                Partnership Signatories & Brand Settings
+              </span>
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={agency.has_dual_signatories ?? true}
+                  onChange={e => updateAgency({ has_dual_signatories: e.target.checked })}
+                  className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                />
+                Enable 2 Partners (Dual Signatories)
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Partner 1 */}
+              <div className="p-2.5 bg-white dark:bg-stone-900 rounded-xl border border-purple-200 dark:border-purple-900/40 space-y-1.5">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Partner 1 (Lead Signatory)
+                </span>
+                <input
+                  type="text"
+                  placeholder="Partner 1 Name"
+                  value={agency.representative || ''}
+                  onChange={e => updateAgency({ representative: e.target.value })}
+                  className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 font-bold"
+                />
+                <input
+                  type="text"
+                  placeholder="Partner 1 Role"
+                  value={agency.partner1_role || ''}
+                  onChange={e => updateAgency({ partner1_role: e.target.value })}
+                  className="w-full px-2 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800"
+                />
+              </div>
+
+              {/* Partner 2 */}
+              <div className={`p-2.5 bg-white dark:bg-stone-900 rounded-xl border border-purple-200 dark:border-purple-900/40 space-y-1.5 ${
+                !(agency.has_dual_signatories ?? true) ? 'opacity-50 pointer-events-none' : ''
+              }`}>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Partner 2 (Co-Signatory)
+                </span>
+                <input
+                  type="text"
+                  placeholder="Partner 2 Name"
+                  value={agency.partner2_name || ''}
+                  onChange={e => updateAgency({ partner2_name: e.target.value })}
+                  className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 font-bold"
+                />
+                <input
+                  type="text"
+                  placeholder="Partner 2 Role"
+                  value={agency.partner2_role || ''}
+                  onChange={e => updateAgency({ partner2_role: e.target.value })}
+                  className="w-full px-2 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800"
+                />
+              </div>
+
+              {/* Logo Upload */}
+              <div className="p-2.5 bg-white dark:bg-stone-900 rounded-xl border border-purple-200 dark:border-purple-900/40 flex flex-col justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Brand Logo
+                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  {agency.logo_url ? (
+                    <img
+                      src={agency.logo_url}
+                      alt="Brand"
+                      className="w-9 h-9 object-contain rounded-lg border border-slate-200 dark:border-stone-700 bg-white"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center text-xs">
+                      {agency.name.charAt(0)}
+                    </div>
+                  )}
+                  <label className="flex-1 cursor-pointer py-1.5 px-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-center rounded-lg font-bold text-xs flex items-center justify-center gap-1">
+                    <Upload size={12} />
+                    Upload Logo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Scrollable Document Area */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 bg-slate-100 dark:bg-[#0D1117] print:bg-white print:p-0">
           <div className="max-w-[760px] mx-auto bg-white dark:bg-stone-900 shadow-xl border border-slate-200 dark:border-stone-800 rounded-3xl p-6 sm:p-10 text-slate-900 dark:text-slate-100 print:shadow-none print:border-none print:p-0 space-y-6">
 
             {/* Letterhead */}
-            <div className="flex justify-between items-start gap-4 pb-6 border-b border-slate-200 dark:border-stone-800">
-              <div className="flex items-center gap-3">
-                {agency.logo_url ? (
-                  <img
-                    src={agency.logo_url}
-                    alt={agency.name}
-                    className="w-12 h-12 object-contain rounded-xl border border-slate-200 dark:border-stone-700 bg-white"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black flex items-center justify-center text-lg">
-                    {agency.name.charAt(0)}
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b border-slate-200 dark:border-stone-800">
+              <div className="flex items-start gap-3.5">
+                <div className="relative group">
+                  {agency.logo_url ? (
+                    <img
+                      src={agency.logo_url}
+                      alt={agency.name}
+                      className="w-14 h-14 object-contain rounded-2xl border border-slate-200 dark:border-stone-700 bg-white p-1"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black flex items-center justify-center text-xl shadow-md">
+                      {agency.name.charAt(0)}
+                    </div>
+                  )}
+                  <label
+                    title="Click to update logo"
+                    className="absolute inset-0 bg-black/50 text-white rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity print:hidden text-[10px] font-bold"
+                  >
+                    Change
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {agency.name}
+                    </h1>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider">
+                      Verified Agency
+                    </span>
                   </div>
-                )}
-                <div>
-                  <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                    {agency.name}
-                  </h1>
-                  <span className="text-[11px] text-slate-500 font-semibold block">
+                  <span className="text-xs text-slate-500 font-semibold block">
                     B2B Technology & Software Services Agreement
                   </span>
+                  <div className="flex flex-wrap items-center gap-x-3 text-[11px] text-slate-500">
+                    <span>{agency.address}</span>
+                    <span>• {agency.phone}</span>
+                    <span>• {agency.email}</span>
+                    {agency.gstin && <span>• GSTIN: {agency.gstin}</span>}
+                  </div>
                 </div>
               </div>
 
-              <div className="text-right">
-                <span className="text-xs font-mono font-bold text-purple-700 dark:text-purple-300 block">
-                  #{agreementNumber}
+              <div className="sm:text-right shrink-0">
+                <span className="inline-block px-3 py-1 rounded-xl bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 font-mono text-xs font-black tracking-wider border border-purple-200 dark:border-purple-800">
+                  REF: #{agreementNumber}
                 </span>
-                <span className="text-[11px] text-slate-500 block mt-0.5">
+                <span className="text-[11px] text-slate-500 block mt-1.5 font-medium">
                   Effective Date: {effectiveDate}
+                </span>
+                <span className="inline-block mt-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-slate-400">
+                  Legally Binding Document
                 </span>
               </div>
             </div>
@@ -497,23 +674,53 @@ Please confirm acceptance so we can commence development immediately!`
               </div>
             )}
 
-            {/* Signature Block for Print */}
-            <div className="pt-8 border-t border-slate-200 dark:border-stone-800 flex justify-between items-end text-xs">
-              <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">Accepted & Signed (Client):</p>
-                <div className="mt-8 border-b border-slate-400 w-44"></div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {clientName || businessName || 'Authorized Client Representative'}
+            {/* Signature Block for Print / Execution */}
+            <div className="pt-8 border-t-2 border-slate-200 dark:border-stone-800 grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs print:grid-cols-3">
+              {/* Column 1: Client Acceptance */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Accepted & Signed (Client)
+                </span>
+                <div className="border-b-2 border-slate-300 dark:border-stone-700 w-full pt-8"></div>
+                <p className="text-xs font-black text-slate-900 dark:text-white truncate mt-1">
+                  {clientName || businessName || 'Client Representative'}
                 </p>
+                <span className="text-[9px] text-slate-500 font-medium block">
+                  Authorized Client Signatory
+                </span>
               </div>
 
-              <div className="text-right">
-                <p className="font-bold text-slate-800 dark:text-slate-200">For {agency.name}:</p>
-                <div className="mt-8 border-b border-slate-400 w-44 ml-auto"></div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {agency.representative} (Authorized Signatory)
+              {/* Column 2: Partner 1 */}
+              <div className="space-y-1 sm:text-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  For {agency.name} (Partner 1)
+                </span>
+                <div className="border-b-2 border-slate-300 dark:border-stone-700 w-full pt-8"></div>
+                <p className="text-xs font-black text-slate-900 dark:text-white truncate mt-1">
+                  {agency.representative || 'Aryan Gupta'}
                 </p>
+                <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold block">
+                  {agency.partner1_role || 'Co-Founder & Technical Lead'}
+                </span>
               </div>
+
+              {/* Column 3: Partner 2 (If Dual Signatories Enabled) */}
+              {(agency.has_dual_signatories ?? true) ? (
+                <div className="space-y-1 sm:text-right">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    For {agency.name} (Partner 2)
+                  </span>
+                  <div className="border-b-2 border-slate-300 dark:border-stone-700 w-full pt-8"></div>
+                  <p className="text-xs font-black text-slate-900 dark:text-white truncate mt-1">
+                    {agency.partner2_name || 'Harsh Vardhan'}
+                  </p>
+                  <span className="text-[9px] text-purple-600 dark:text-purple-400 font-bold block">
+                    {agency.partner2_role || 'Co-Founder & Operations Lead'}
+                  </span>
+                </div>
+              ) : (
+                <div className="hidden sm:block"></div>
+              )}
             </div>
 
           </div>
