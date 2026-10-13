@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+export const maxDuration = 120
+
 const apifyToken = process.env.APIFY_API_TOKEN
 
 async function scrapeGooglePlacesViaApify(search: string, location: string, limit: number) {
   const actorId = 'compass~crawler-google-places'
-  const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}&timeout=65`
+  // Use 110s timeout on Apify so it has ample time while staying within Next.js function limits
+  const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}&timeout=110`
 
   // Sanitize location if user specified multiple cities with & or and
   const sanitizedLocation = location.includes('&')
@@ -14,26 +17,63 @@ async function scrapeGooglePlacesViaApify(search: string, location: string, limi
     ? location.split(' and ')[0].trim()
     : location
 
+  // Construct a single, direct, high-precision search string
+  const cleanSearch = sanitizedLocation
+    ? (search.toLowerCase().includes(sanitizedLocation.toLowerCase()) ? search : `${search} in ${sanitizedLocation}`)
+    : search
+
+  // Lean, high-speed parameters: disable reviews and image scraping which slow down Apify 10x!
+  const batchLimit = Math.min(Math.max(limit, 5), 15)
   const body = {
-    searchStringsArray: [search, `${search} in ${location}`],
-    locationQuery: sanitizedLocation,
-    maxCrawledPlacesPerSearch: limit,
+    searchStringsArray: [cleanSearch],
+    maxCrawledPlacesPerSearch: batchLimit,
     language: 'en',
-    skipClosedPlaces: true
+    skipClosedPlaces: true,
+    maxReviews: 0,
+    maxImages: 0,
+    scrapePlaceDetail: false
   }
 
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(75000)
+    signal: AbortSignal.timeout(118000)
   })
 
   if (!res.ok) {
     const errText = await res.text()
-    if (res.status === 401 || errText.includes('user-or-token-not-found') || errText.includes('token') || errText.includes('not-found')) {
+
+    // 1. Check for token expiration
+    if (res.status === 401 || errText.includes('user-or-token-not-found')) {
       throw new Error('Apify API Token expired ya invalid ho gaya hai (401 Unauthorized). Kripya https://console.apify.com se naya token lekar update karein.')
     }
+
+    // 2. Check if run timed out or failed but generated dataset items before timing out
+    const runIdMatch = errText.match(/run ID:\s*([a-zA-Z0-9]+)/i)
+    if (runIdMatch && runIdMatch[1]) {
+      try {
+        console.log(`[Apify Timeout Recovery] Attempting to retrieve partial items from run ${runIdMatch[1]}...`)
+        const runRes = await fetch(`https://api.apify.com/v2/actor-runs/${runIdMatch[1]}?token=${apifyToken}`)
+        const runData = await runRes.json()
+        const dsId = runData.data?.defaultDatasetId
+        if (dsId) {
+          const dsRes = await fetch(`https://api.apify.com/v2/datasets/${dsId}/items?token=${apifyToken}`)
+          const partialItems = await dsRes.json()
+          if (Array.isArray(partialItems) && partialItems.length > 0) {
+            console.log(`[Apify Recovery] Successfully saved ${partialItems.length} items from run before timeout!`)
+            return partialItems
+          }
+        }
+      } catch (recoveryErr) {
+        console.warn('Partial dataset recovery failed:', recoveryErr)
+      }
+    }
+
+    if (errText.includes('TIMED-OUT') || errText.includes('timeout')) {
+      throw new Error('Google Maps crawler response time zyaada lene se timeout hua. Kripya dubara "⚡ Run" dabayein.')
+    }
+
     throw new Error(`Apify failed with ${res.status}: ${errText}`)
   }
 
@@ -100,10 +140,8 @@ export async function POST(req: Request) {
 
     console.log(`[Run Campaign ${campaignId}] Current: ${currentTotal}/${maxLeads}. Need: ${needed} leads. Filters: ${activeWebsiteFilters.join(',') || 'all'}`)
 
-    // 4. Request enough candidate places so filtering doesn't leave the target unfulfilled
-    const hasStrictFilter = activeWebsiteFilters.length > 0 && !activeWebsiteFilters.includes('all')
-    const candidateMultiplier = hasStrictFilter ? 2.5 : 1.3
-    const crawlLimit = Math.min(Math.max(Math.ceil(needed * candidateMultiplier), needed + 10), 60)
+    // 4. Request up to 15 places per run batch to ensure lightning fast execution (<30s) without timeouts
+    const crawlLimit = Math.min(Math.max(needed, 5), 15)
 
     const places = await scrapeGooglePlacesViaApify(campaign.search_query, campaign.location, crawlLimit)
     const importedLeads: any[] = []

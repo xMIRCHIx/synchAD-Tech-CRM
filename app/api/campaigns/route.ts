@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+export const maxDuration = 120
+
 const apifyToken = process.env.APIFY_API_TOKEN
 
 export async function GET() {
@@ -106,9 +108,7 @@ export async function POST(req: Request) {
     if (instantScrape && apifyToken) {
       try {
         console.log(`[Campaign ${campaign.id}] Scraping ${query} in ${location} via Apify (Target: ${targetCount})...`)
-        const hasStrictFilter = targetWebsiteTypes && Array.isArray(targetWebsiteTypes) && targetWebsiteTypes.length > 0 && !targetWebsiteTypes.includes('all')
-        const candidateMultiplier = hasStrictFilter ? 2.5 : 1.3
-        const apifyFetchLimit = Math.min(Math.max(Math.ceil(targetCount * candidateMultiplier), targetCount + 10), 60)
+        const apifyFetchLimit = Math.min(Math.max(targetCount, 5), 15)
 
         const places = await scrapeGooglePlacesViaApify(query, location, apifyFetchLimit)
 
@@ -273,7 +273,8 @@ export async function DELETE(req: Request) {
 // Helper to call Apify Google Places scraper
 async function scrapeGooglePlacesViaApify(search: string, location: string, limit: number) {
   const actorId = 'compass~crawler-google-places'
-  const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}&timeout=65`
+  // Use 110s timeout on Apify so it has ample time while staying within Next.js function limits
+  const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}&timeout=110`
 
   const sanitizedLocation = location.includes('&')
     ? location.split('&')[0].trim()
@@ -281,26 +282,59 @@ async function scrapeGooglePlacesViaApify(search: string, location: string, limi
     ? location.split(' and ')[0].trim()
     : location
 
+  const cleanSearch = sanitizedLocation
+    ? (search.toLowerCase().includes(sanitizedLocation.toLowerCase()) ? search : `${search} in ${sanitizedLocation}`)
+    : search
+
+  const batchLimit = Math.min(Math.max(limit, 5), 15)
   const body = {
-    searchStringsArray: [search, `${search} in ${location}`],
-    locationQuery: sanitizedLocation,
-    maxCrawledPlacesPerSearch: limit,
+    searchStringsArray: [cleanSearch],
+    maxCrawledPlacesPerSearch: batchLimit,
     language: 'en',
-    skipClosedPlaces: true
+    skipClosedPlaces: true,
+    maxReviews: 0,
+    maxImages: 0,
+    scrapePlaceDetail: false
   }
 
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(75000)
+    signal: AbortSignal.timeout(118000)
   })
 
   if (!res.ok) {
     const errText = await res.text()
-    if (res.status === 401 || errText.includes('user-or-token-not-found') || errText.includes('token') || errText.includes('not-found')) {
+
+    if (res.status === 401 || errText.includes('user-or-token-not-found')) {
       throw new Error('Apify API Token expired ya invalid ho gaya hai (401 Unauthorized). Kripya https://console.apify.com se naya token lekar update karein.')
     }
+
+    const runIdMatch = errText.match(/run ID:\s*([a-zA-Z0-9]+)/i)
+    if (runIdMatch && runIdMatch[1]) {
+      try {
+        console.log(`[Apify Timeout Recovery] Attempting to retrieve partial items from run ${runIdMatch[1]}...`)
+        const runRes = await fetch(`https://api.apify.com/v2/actor-runs/${runIdMatch[1]}?token=${apifyToken}`)
+        const runData = await runRes.json()
+        const dsId = runData.data?.defaultDatasetId
+        if (dsId) {
+          const dsRes = await fetch(`https://api.apify.com/v2/datasets/${dsId}/items?token=${apifyToken}`)
+          const partialItems = await dsRes.json()
+          if (Array.isArray(partialItems) && partialItems.length > 0) {
+            console.log(`[Apify Recovery] Successfully saved ${partialItems.length} items from run before timeout!`)
+            return partialItems
+          }
+        }
+      } catch (recoveryErr) {
+        console.warn('Partial dataset recovery failed:', recoveryErr)
+      }
+    }
+
+    if (errText.includes('TIMED-OUT') || errText.includes('timeout')) {
+      throw new Error('Google Maps crawler response time zyaada lene se timeout hua. Kripya dubara "⚡ Run" dabayein.')
+    }
+
     throw new Error(`Apify returned ${res.status}: ${errText}`)
   }
 
