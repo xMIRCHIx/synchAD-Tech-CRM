@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       targetDeadline = '4 weeks from start date',
       partner1Name = 'Aryan Gupta',
       partner1Role = 'Co-Founder & Technical Director',
-      partner2Name = 'Harsh Vardhan',
+      partner2Name = 'Dewansh Chatterjee',
       partner2Role = 'Co-Founder & Managing Partner',
       hasDualPartners = true,
       customInstruction = ''

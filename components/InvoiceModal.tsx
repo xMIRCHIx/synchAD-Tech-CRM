@@ -50,7 +50,7 @@ const DEFAULT_AGENCY: AgencyProfile & { pan?: string; tagline?: string; place_of
   name: 'SynchAD Tech',
   representative: 'Aryan Gupta',
   partner1_role: 'Co-Founder & Technical Director',
-  partner2_name: 'Harsh Vardhan',
+  partner2_name: 'Dewansh Chatterjee',
   partner2_role: 'Co-Founder & Managing Partner',
   has_dual_signatories: true,
   email: 'hello@synchadtech.com',
@@ -1059,7 +1059,7 @@ Thank you for choosing ${agency.name}!`
 
                     {(agency.has_dual_signatories ?? true) && (
                       <div style={{ marginTop: '4px', paddingTop: '3px', borderTop: '1px dotted var(--line)' }}>
-                        <b>{agency.partner2_name || 'Harsh Vardhan'}</b>
+                        <b>{agency.partner2_name || 'Dewansh Chatterjee'}</b>
                         <br />
                         <span className="BLzxva_muted">{agency.partner2_role || 'Managing Partner'}</span>
                       </div>

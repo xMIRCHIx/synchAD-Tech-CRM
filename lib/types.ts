@@ -206,4 +206,15 @@ export interface AgencyProfile {
   ifsc_code?: string
 }
 
-
+export interface AgencyNote {
+  id: string
+  title: string
+  content: string
+  client_id?: string | null
+  client_name?: string | null
+  category: 'general' | 'client' | 'call' | 'deal' | 'todo' | 'idea'
+  date?: string | null
+  is_pinned?: boolean
+  created_at: string
+  updated_at: string
+}

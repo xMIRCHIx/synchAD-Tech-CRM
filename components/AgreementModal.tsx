@@ -58,7 +58,7 @@ const DEFAULT_AGENCY: AgencyProfile & { pan?: string; city?: string; state?: str
   name: 'SynchAD Tech',
   representative: 'Aryan Gupta',
   partner1_role: 'Co-Founder & Technical Director',
-  partner2_name: 'Harsh Vardhan',
+  partner2_name: 'Dewansh Chatterjee',
   partner2_role: 'Co-Founder & Managing Partner',
   has_dual_signatories: true,
   email: 'hello@synchadtech.com',
@@ -1205,7 +1205,7 @@ Thank you for choosing ${agency.name}!`
                     <div className="Uvh_Ra_who">For the Provider (Partner 2)</div>
                     <div>{agency.name}</div>
                     <div className="Uvh_Ra_space"><span>Signature</span><span>Company stamp</span></div>
-                    <div className="Uvh_Ra_ln"><span>Name</span><span>{agency.partner2_name || 'Harsh Vardhan'}</span></div>
+                    <div className="Uvh_Ra_ln"><span>Name</span><span>{agency.partner2_name || 'Dewansh Chatterjee'}</span></div>
                     <div className="Uvh_Ra_ln"><span>Title</span><span>{agency.partner2_role || 'Managing Partner'}</span></div>
                     <div className="Uvh_Ra_ln"><span>Date</span><span>&nbsp;</span></div>
                     <div className="Uvh_Ra_ln"><span>Place</span><span>{agreementPlace}</span></div>

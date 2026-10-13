@@ -21,7 +21,8 @@ import {
   UserPlus,
   Receipt,
   FileText,
-  Briefcase
+  Briefcase,
+  StickyNote
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -33,6 +34,7 @@ const navItems = [
   { href: '/deals', icon: Briefcase, label: 'Deals & Scope' },
   { href: '/invoices', icon: Receipt, label: 'Invoices' },
   { href: '/agreements', icon: FileText, label: 'Agreements' },
+  { href: '/notepad', icon: StickyNote, label: 'Notepad' },
   { href: '/inbox', icon: MessageSquare, label: 'WhatsApp Inbox' },
   { href: '/campaigns', icon: Target, label: 'Campaigns' },
   { href: '/whatsapp-profile', icon: ShieldCheck, label: 'WhatsApp Profile' },
