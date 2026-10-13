@@ -291,7 +291,11 @@ async function scrapeGooglePlacesViaApify(search: string, location: string, limi
   })
 
   if (!res.ok) {
-    throw new Error(`Apify returned ${res.status}: ${await res.text()}`)
+    const errText = await res.text()
+    if (res.status === 401 || errText.includes('user-or-token-not-found') || errText.includes('token') || errText.includes('not-found')) {
+      throw new Error('Apify API Token expired ya invalid ho gaya hai (401 Unauthorized). Kripya https://console.apify.com se naya token lekar update karein.')
+    }
+    throw new Error(`Apify returned ${res.status}: ${errText}`)
   }
 
   const data = await res.json()
