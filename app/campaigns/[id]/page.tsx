@@ -161,45 +161,71 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
   }
 
   // Instant Scrape More Leads
+  // Instant Scrape More Leads (Auto-Batch Continuous Loop)
   async function handleScrapeMore() {
     if (!campaign) return
     setIsScraping(true)
+    let totalImportedThisSession = 0
+    let runsCount = 0
+    const maxBatches = 8
+
     try {
-      const res = await fetch('/api/campaigns/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId: campaign.id })
-      })
-      const data = await res.json()
-      if (res.ok) {
+      while (runsCount < maxBatches) {
+        runsCount++
+        const res = await fetch('/api/campaigns/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId: campaign.id })
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to scrape')
+        }
+
+        totalImportedThisSession += (data.leadsImported || 0)
         await fetchCampaignAndLeads()
-        if (data.isFull || data.leadsImported === 0) {
+
+        // Check if goal reached
+        if (data.isFull || data.totalLeads >= data.maxLeads) {
           setToast({
             id: Date.now().toString(),
-            title: 'Goal Already Met',
-            description: `Campaign already has all ${data.maxLeads || campaign.max_leads} required leads.`,
-            type: 'info'
-          })
-        } else {
-          setToast({
-            id: Date.now().toString(),
-            title: 'Scrape Complete!',
-            description: `Added ${data.leadsImported} verified leads. Total: ${data.totalLeads}/${data.maxLeads} leads.`,
+            title: 'Campaign Goal Reached! 🎯',
+            description: `All ${data.maxLeads} leads imported and ready in CRM! Added ${totalImportedThisSession} new leads in this session.`,
             type: 'success'
           })
+          break
         }
-      } else {
-        throw new Error(data.error || 'Failed to scrape')
+
+        // If no new leads found
+        if (data.leadsImported === 0) {
+          setToast({
+            id: Date.now().toString(),
+            title: 'Scraping Completed',
+            description: `Extracted all available Google Maps places for this niche. Campaign has ${data.totalLeads}/${data.maxLeads} leads.`,
+            type: totalImportedThisSession > 0 ? 'success' : 'info'
+          })
+          break
+        }
+
+        // Show live batch progress toast
+        setToast({
+          id: Date.now().toString(),
+          title: `Scraping in progress (${data.totalLeads}/${data.maxLeads})`,
+          description: `Batch ${runsCount}: Added ${data.leadsImported} leads. Fetching next batch...`,
+          type: 'info'
+        })
       }
     } catch (err: any) {
       setToast({
         id: Date.now().toString(),
-        title: 'Scrape Failed',
+        title: 'Scrape Paused',
         description: err.message,
         type: 'error'
       })
     } finally {
       setIsScraping(false)
+      await fetchCampaignAndLeads()
     }
   }
 

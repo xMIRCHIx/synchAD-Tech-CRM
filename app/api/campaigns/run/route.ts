@@ -5,7 +5,12 @@ export const maxDuration = 120
 
 const apifyToken = process.env.APIFY_API_TOKEN
 
-async function scrapeGooglePlacesViaApify(search: string, location: string, limit: number) {
+async function scrapeGooglePlacesViaApify(
+  search: string,
+  location: string,
+  limit: number,
+  websiteFilter: 'allPlaces' | 'withWebsite' | 'withoutWebsite' = 'allPlaces'
+) {
   const actorId = 'compass~crawler-google-places'
   // Use 110s timeout on Apify so it has ample time while staying within Next.js function limits
   const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}&timeout=110`
@@ -23,12 +28,13 @@ async function scrapeGooglePlacesViaApify(search: string, location: string, limi
     : search
 
   // Lean, high-speed parameters: disable reviews and image scraping which slow down Apify 10x!
-  const batchLimit = Math.min(Math.max(limit, 5), 15)
+  const batchLimit = Math.min(Math.max(limit, 5), 20)
   const body = {
     searchStringsArray: [cleanSearch],
     maxCrawledPlacesPerSearch: batchLimit,
     language: 'en',
     skipClosedPlaces: true,
+    website: websiteFilter,
     maxReviews: 0,
     maxImages: 0,
     scrapePlaceDetail: false
@@ -138,12 +144,36 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`[Run Campaign ${campaignId}] Current: ${currentTotal}/${maxLeads}. Need: ${needed} leads. Filters: ${activeWebsiteFilters.join(',') || 'all'}`)
+    let apifyWebsiteFilter: 'allPlaces' | 'withWebsite' | 'withoutWebsite' = 'allPlaces'
+    if (activeWebsiteFilters.includes('none') && !activeWebsiteFilters.includes('exists')) {
+      apifyWebsiteFilter = 'withoutWebsite'
+    } else if (activeWebsiteFilters.includes('exists') && !activeWebsiteFilters.includes('none')) {
+      apifyWebsiteFilter = 'withWebsite'
+    }
 
-    // 4. Request up to 15 places per run batch to ensure lightning fast execution (<30s) without timeouts
-    const crawlLimit = Math.min(Math.max(needed, 5), 15)
+    // Smart Multi-City Rotation (e.g. "Bhopal & Indore, India")
+    const rawCities = (campaign.location || '')
+      .split(/[&,]|(?:\band\b)/i)
+      .map((s: string) => s.trim().replace(/,\s*India/i, ''))
+      .filter((s: string) => s.length > 1)
+    const currentCity = rawCities.length > 0 ? rawCities[currentTotal % rawCities.length] : campaign.location
 
-    const places = await scrapeGooglePlacesViaApify(campaign.search_query, campaign.location, crawlLimit)
+    // Query Variations so Google Maps doesn't stall when one query is exhausted
+    const baseQuery = campaign.search_query || 'business'
+    const queryVariations = [
+      baseQuery,
+      `${baseQuery} dealers`,
+      `${baseQuery} brokers`,
+      `${baseQuery} consultants`,
+      `${baseQuery} agency`
+    ]
+    const currentQuery = queryVariations[Math.floor(currentTotal / 4) % queryVariations.length]
+
+    // 4. Request up to 20 places per run batch
+    const crawlLimit = Math.min(Math.max(needed, 5), 20)
+
+    console.log(`[Run Campaign ${campaignId}] Query: "${currentQuery}" in "${currentCity}" (Filter: ${apifyWebsiteFilter}, Limit: ${crawlLimit})`)
+    const places = await scrapeGooglePlacesViaApify(currentQuery, currentCity, crawlLimit, apifyWebsiteFilter)
     const importedLeads: any[] = []
     let updatedTotal = currentTotal
 
