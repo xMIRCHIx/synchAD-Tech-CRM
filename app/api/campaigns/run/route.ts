@@ -28,7 +28,7 @@ async function scrapeGooglePlacesViaApify(
     : search
 
   // Lean, high-speed parameters: disable reviews and image scraping which slow down Apify 10x!
-  const batchLimit = Math.min(Math.max(limit, 5), 20)
+  const batchLimit = Math.min(Math.max(limit, 10), 35)
   const body = {
     searchStringsArray: [cleanSearch],
     maxCrawledPlacesPerSearch: batchLimit,
@@ -151,26 +151,86 @@ export async function POST(req: Request) {
       apifyWebsiteFilter = 'withWebsite'
     }
 
-    // Smart Multi-City Rotation (e.g. "Bhopal & Indore, India")
-    const rawCities = (campaign.location || '')
-      .split(/[&,]|(?:\band\b)/i)
-      .map((s: string) => s.trim().replace(/,\s*India/i, ''))
-      .filter((s: string) => s.length > 1)
-    const currentCity = rawCities.length > 0 ? rawCities[currentTotal % rawCities.length] : campaign.location
+    // Clean location and extract pure cities and prime sub-localities
+    const cleanLoc = (campaign.location || '').replace(/,\s*India/gi, '').trim()
+    let localitiesPool: string[] = []
 
-    // Query Variations so Google Maps doesn't stall when one query is exhausted
-    const baseQuery = campaign.search_query || 'business'
-    const queryVariations = [
-      baseQuery,
-      `${baseQuery} dealers`,
-      `${baseQuery} brokers`,
-      `${baseQuery} consultants`,
-      `${baseQuery} agency`
-    ]
-    const currentQuery = queryVariations[Math.floor(currentTotal / 4) % queryVariations.length]
+    if (cleanLoc.toLowerCase().includes('bhopal') && cleanLoc.toLowerCase().includes('indore')) {
+      localitiesPool = [
+        'Bhopal',
+        'Indore',
+        'MP Nagar Bhopal',
+        'Vijay Nagar Indore',
+        'Kolar Road Bhopal',
+        'Palasia Indore',
+        'Hoshangabad Road Bhopal',
+        'Bhawarkua Indore',
+        'Arera Colony Bhopal',
+        'Super Corridor Indore',
+        'Ayodhya Bypass Bhopal',
+        'AB Road Indore',
+        'Rau Indore',
+        'Shahpura Bhopal',
+        'Sudama Nagar Indore'
+      ]
+    } else if (cleanLoc.toLowerCase().includes('bhopal')) {
+      localitiesPool = [
+        'Bhopal',
+        'MP Nagar Bhopal',
+        'Kolar Road Bhopal',
+        'Hoshangabad Road Bhopal',
+        'Arera Colony Bhopal',
+        'Ayodhya Bypass Bhopal',
+        'Shahpura Bhopal',
+        'Bairagarh Bhopal'
+      ]
+    } else if (cleanLoc.toLowerCase().includes('indore')) {
+      localitiesPool = [
+        'Indore',
+        'Vijay Nagar Indore',
+        'Palasia Indore',
+        'Bhawarkua Indore',
+        'Super Corridor Indore',
+        'AB Road Indore',
+        'Rau Indore',
+        'Sudama Nagar Indore'
+      ]
+    } else {
+      const raw = cleanLoc.split(/[&,]|(?:\band\b)/i).map(s => s.trim()).filter(s => s.length > 1 && s.toLowerCase() !== 'india')
+      localitiesPool = raw.length > 0 ? raw : [cleanLoc]
+    }
 
-    // 4. Request up to 20 places per run batch
-    const crawlLimit = Math.min(Math.max(needed, 5), 20)
+    const currentCity = localitiesPool[currentTotal % localitiesPool.length]
+
+    // Rich query variations so Google Maps returns dozens of new places every batch
+    const baseQuery = (campaign.search_query || 'business').toLowerCase()
+    let queryPool: string[] = []
+
+    if (baseQuery.includes('real estate') || baseQuery.includes('property') || baseQuery.includes('builder')) {
+      queryPool = [
+        'property dealers',
+        'real estate builders',
+        'property consultants',
+        'real estate brokers',
+        'colonizers and builders',
+        'commercial property dealers',
+        'flat and plot agents',
+        'real estate agents'
+      ]
+    } else {
+      queryPool = [
+        baseQuery,
+        `${baseQuery} services`,
+        `${baseQuery} agency`,
+        `top ${baseQuery}`,
+        `${baseQuery} center`
+      ]
+    }
+
+    const currentQuery = queryPool[Math.floor(currentTotal / 2) % queryPool.length]
+
+    // 4. Request up to 35 places per run batch
+    const crawlLimit = Math.min(Math.max(needed, 10), 35)
 
     console.log(`[Run Campaign ${campaignId}] Query: "${currentQuery}" in "${currentCity}" (Filter: ${apifyWebsiteFilter}, Limit: ${crawlLimit})`)
     const places = await scrapeGooglePlacesViaApify(currentQuery, currentCity, crawlLimit, apifyWebsiteFilter)

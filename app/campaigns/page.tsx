@@ -93,7 +93,8 @@ export default function CampaignsPage() {
     setRunningScrapeId(campaignId)
     let totalImportedThisSession = 0
     let runsCount = 0
-    const maxBatches = 8
+    let consecutiveEmptyCount = 0
+    const maxBatches = 15
 
     try {
       while (runsCount < maxBatches) {
@@ -123,15 +124,19 @@ export default function CampaignsPage() {
           break
         }
 
-        // If no new leads could be found in this query, stop loop
         if (data.leadsImported === 0) {
-          setToast({
-            id: Date.now().toString(),
-            title: 'Scraping Completed',
-            description: `Extracted all available Google Maps places for this niche. Campaign is at ${data.totalLeads}/${data.maxLeads} leads.`,
-            type: totalImportedThisSession > 0 ? 'success' : 'info'
-          })
-          break
+          consecutiveEmptyCount++
+          if (consecutiveEmptyCount >= 2) {
+            setToast({
+              id: Date.now().toString(),
+              title: 'Scraping Completed',
+              description: `Campaign is at ${data.totalLeads}/${data.maxLeads} leads. Added ${totalImportedThisSession} new leads in this session.`,
+              type: totalImportedThisSession > 0 ? 'success' : 'info'
+            })
+            break
+          }
+        } else {
+          consecutiveEmptyCount = 0
         }
 
         // Show live batch progress toast while continuing to next batch
