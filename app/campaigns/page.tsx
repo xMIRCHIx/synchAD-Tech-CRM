@@ -94,7 +94,7 @@ export default function CampaignsPage() {
     let totalImportedThisSession = 0
     let runsCount = 0
     let consecutiveEmptyCount = 0
-    const maxBatches = 15
+    const maxBatches = 25
 
     try {
       while (runsCount < maxBatches) {
@@ -126,7 +126,7 @@ export default function CampaignsPage() {
 
         if (data.leadsImported === 0) {
           consecutiveEmptyCount++
-          if (consecutiveEmptyCount >= 2) {
+          if (consecutiveEmptyCount >= 5) {
             setToast({
               id: Date.now().toString(),
               title: 'Scraping Completed',

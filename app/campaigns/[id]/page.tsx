@@ -168,7 +168,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
     let totalImportedThisSession = 0
     let runsCount = 0
     let consecutiveEmptyCount = 0
-    const maxBatches = 15
+    const maxBatches = 25
 
     try {
       while (runsCount < maxBatches) {
@@ -201,7 +201,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
         // If no new leads found in this single query, retry with next query variation
         if (data.leadsImported === 0) {
           consecutiveEmptyCount++
-          if (consecutiveEmptyCount >= 2) {
+          if (consecutiveEmptyCount >= 5) {
             setToast({
               id: Date.now().toString(),
               title: 'Scraping Completed',
