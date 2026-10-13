@@ -275,9 +275,15 @@ async function scrapeGooglePlacesViaApify(search: string, location: string, limi
   const actorId = 'compass~crawler-google-places'
   const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}&timeout=65`
 
+  const sanitizedLocation = location.includes('&')
+    ? location.split('&')[0].trim()
+    : location.includes(' and ')
+    ? location.split(' and ')[0].trim()
+    : location
+
   const body = {
-    searchStringsArray: [search],
-    locationQuery: location,
+    searchStringsArray: [search, `${search} in ${location}`],
+    locationQuery: sanitizedLocation,
     maxCrawledPlacesPerSearch: limit,
     language: 'en',
     skipClosedPlaces: true
