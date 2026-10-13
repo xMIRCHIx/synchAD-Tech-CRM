@@ -12,84 +12,122 @@ async function scrapeGooglePlacesViaApify(
   websiteFilter: 'allPlaces' | 'withWebsite' | 'withoutWebsite' = 'allPlaces'
 ) {
   const actorId = 'compass~crawler-google-places'
-  // Use 110s timeout on Apify so it has ample time while staying within Next.js function limits
-  const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}&timeout=110`
 
-  // Sanitize location if user specified multiple cities with & or and
+  // Sanitize location
   const sanitizedLocation = location.includes('&')
     ? location.split('&')[0].trim()
     : location.includes(' and ')
     ? location.split(' and ')[0].trim()
     : location
 
-  // Construct a single, direct, high-precision search string
+  // Construct clean search string
   const cleanSearch = sanitizedLocation
     ? (search.toLowerCase().includes(sanitizedLocation.toLowerCase()) ? search : `${search} in ${sanitizedLocation}`)
     : search
 
-  // Lean, high-speed parameters: disable reviews and image scraping which slow down Apify 10x!
-  const batchLimit = Math.min(Math.max(limit, 10), 35)
-  const body = {
-    searchStringsArray: [cleanSearch],
-    maxCrawledPlacesPerSearch: batchLimit,
-    language: 'en',
-    skipClosedPlaces: true,
-    website: websiteFilter,
-    maxReviews: 0,
-    maxImages: 0,
-    scrapePlaceDetail: false
-  }
+  const batchLimit = Math.min(Math.max(limit, 15), 35)
 
-  const res = await fetch(url, {
+  // STEP 1: Start an ultra-fast async run (returns in ~1.5s)
+  const startUrl = `https://api.apify.com/v2/acts/${actorId}/runs?token=${apifyToken}`
+  const startRes = await fetch(startUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(118000)
+    body: JSON.stringify({
+      searchStringsArray: [cleanSearch],
+      locationQuery: sanitizedLocation ? `${sanitizedLocation}, India` : undefined,
+      maxCrawledPlacesPerSearch: batchLimit,
+      language: 'en',
+      skipClosedPlaces: true,
+      website: websiteFilter,
+      maxReviews: 0,
+      maxImages: 0,
+      scrapePlaceDetail: false,
+      scrapePlaceDetailPage: false,
+      searchMatching: 'all',
+      includeWebResults: false,
+      scrapeDirectories: false,
+      scrapeContacts: false,
+      maximumLeadsEnrichmentRecords: 0
+    }),
+    signal: AbortSignal.timeout(10000)
   })
 
-  if (!res.ok) {
-    const errText = await res.text()
-
-    // 1. Check for token expiration
-    if (res.status === 401 || errText.includes('user-or-token-not-found')) {
-      throw new Error('Apify API Token expired ya invalid ho gaya hai (401 Unauthorized). Kripya https://console.apify.com se naya token lekar update karein.')
+  if (!startRes.ok) {
+    const errText = await startRes.text()
+    if (startRes.status === 401 || errText.includes('user-or-token-not-found')) {
+      throw new Error('Apify API Token expired ya invalid ho gaya hai (401). Naya token https://console.apify.com se lekar .env.local me update karein.')
     }
-
-    // 2. Check if run timed out or failed but generated dataset items before timing out
-    const runIdMatch = errText.match(/run ID:\s*([a-zA-Z0-9]+)/i)
-    if (runIdMatch && runIdMatch[1]) {
-      try {
-        console.log(`[Apify Timeout Recovery] Attempting to retrieve partial items from run ${runIdMatch[1]}...`)
-        const runRes = await fetch(`https://api.apify.com/v2/actor-runs/${runIdMatch[1]}?token=${apifyToken}`)
-        const runData = await runRes.json()
-        const dsId = runData.data?.defaultDatasetId
-        if (dsId) {
-          const dsRes = await fetch(`https://api.apify.com/v2/datasets/${dsId}/items?token=${apifyToken}`)
-          const partialItems = await dsRes.json()
-          if (Array.isArray(partialItems) && partialItems.length > 0) {
-            console.log(`[Apify Recovery] Successfully saved ${partialItems.length} items from run before timeout!`)
-            return partialItems
-          }
-        }
-      } catch (recoveryErr) {
-        console.warn('Partial dataset recovery failed:', recoveryErr)
-      }
-    }
-
-    if (errText.includes('TIMED-OUT') || errText.includes('timeout')) {
-      throw new Error('Google Maps crawler response time zyaada lene se timeout hua. Kripya dubara "⚡ Run" dabayein.')
-    }
-
-    throw new Error(`Apify failed with ${res.status}: ${errText}`)
+    throw new Error(`Apify run start failed: ${startRes.status} - ${errText.slice(0, 200)}`)
   }
 
-  const data = await res.json()
-  return Array.isArray(data) ? data : []
+  const startData = await startRes.json()
+  const runId: string = startData.data?.id
+  const datasetId: string = startData.data?.defaultDatasetId
+
+  if (!runId) throw new Error('Apify did not return a run ID')
+
+  // STEP 2: Poll for run completion (checks every 2s, typically completes in 12-18s)
+  const pollStart = Date.now()
+  const maxPollMs = 45_000
+  const pollIntervalMs = 2_000
+
+  while (Date.now() - pollStart < maxPollMs) {
+    await new Promise(r => setTimeout(r, pollIntervalMs))
+
+    const statusRes = await fetch(
+      `https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!statusRes.ok) continue
+
+    const statusData = await statusRes.json()
+    const runStatus: string = statusData.data?.status
+
+    if (runStatus === 'SUCCEEDED') {
+      // STEP 3: Fetch dataset items
+      const itemsRes = await fetch(
+        `https://api.apify.com/v2/datasets/${datasetId || statusData.data?.defaultDatasetId}/items?token=${apifyToken}`,
+        { signal: AbortSignal.timeout(10000) }
+      )
+      if (!itemsRes.ok) return []
+      const items = await itemsRes.json()
+      return Array.isArray(items) ? items : []
+    }
+
+    if (runStatus === 'FAILED' || runStatus === 'TIMED-OUT' || runStatus === 'ABORTED') {
+      // Try to recover partial results from dataset
+      try {
+        const partialRes = await fetch(
+          `https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}`,
+          { signal: AbortSignal.timeout(5000) }
+        )
+        if (partialRes.ok) {
+          const partial = await partialRes.json()
+          if (Array.isArray(partial) && partial.length > 0) return partial
+        }
+      } catch {}
+      return []
+    }
+  }
+
+  // Timeout: try to get whatever partial results exist
+  try {
+    const partialRes = await fetch(
+      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (partialRes.ok) {
+      const partial = await partialRes.json()
+      if (Array.isArray(partial)) return partial
+    }
+  } catch {}
+  return []
 }
+
 
 export async function POST(req: Request) {
   try {
-    const { campaignId, targetWebsiteTypes } = await req.json()
+    const { campaignId, targetWebsiteTypes, attempt = 0 } = await req.json()
 
     if (!campaignId) {
       return NextResponse.json({ error: 'campaignId is required' }, { status: 400 })
@@ -158,9 +196,10 @@ export async function POST(req: Request) {
 
     // Clean location and extract pure cities and prime sub-localities
     const cleanLoc = (campaign.location || '').replace(/,\s*India/gi, '').trim()
+    const locLower = cleanLoc.toLowerCase()
     let localitiesPool: string[] = []
 
-    if (cleanLoc.toLowerCase().includes('bhopal') && cleanLoc.toLowerCase().includes('indore')) {
+    if (locLower.includes('bhopal') && locLower.includes('indore')) {
       localitiesPool = [
         'Bhopal',
         'Indore',
@@ -178,7 +217,7 @@ export async function POST(req: Request) {
         'Shahpura Bhopal',
         'Sudama Nagar Indore'
       ]
-    } else if (cleanLoc.toLowerCase().includes('bhopal')) {
+    } else if (locLower.includes('bhopal')) {
       localitiesPool = [
         'Bhopal',
         'MP Nagar Bhopal',
@@ -187,9 +226,10 @@ export async function POST(req: Request) {
         'Arera Colony Bhopal',
         'Ayodhya Bypass Bhopal',
         'Shahpura Bhopal',
-        'Bairagarh Bhopal'
+        'Bairagarh Bhopal',
+        'New Market Bhopal'
       ]
-    } else if (cleanLoc.toLowerCase().includes('indore')) {
+    } else if (locLower.includes('indore')) {
       localitiesPool = [
         'Indore',
         'Vijay Nagar Indore',
@@ -198,14 +238,114 @@ export async function POST(req: Request) {
         'Super Corridor Indore',
         'AB Road Indore',
         'Rau Indore',
-        'Sudama Nagar Indore'
+        'Sudama Nagar Indore',
+        'Annapurna Indore',
+        'Geeta Bhavan Indore'
+      ]
+    } else if (locLower.includes('delhi')) {
+      localitiesPool = [
+        'Delhi',
+        'South Delhi',
+        'North Delhi',
+        'Dwarka Delhi',
+        'Rohini Delhi',
+        'Laxmi Nagar Delhi',
+        'Karol Bagh Delhi',
+        'Connaught Place Delhi',
+        'Saket Delhi',
+        'Janakpuri Delhi',
+        'Hauz Khas Delhi',
+        'Pitampura Delhi',
+        'Mayur Vihar Delhi'
+      ]
+    } else if (locLower.includes('mumbai')) {
+      localitiesPool = [
+        'Mumbai',
+        'Andheri Mumbai',
+        'Bandra Mumbai',
+        'Borivali Mumbai',
+        'Dadar Mumbai',
+        'Thane',
+        'Navi Mumbai',
+        'Powai Mumbai',
+        'Goregaon Mumbai',
+        'Malad Mumbai',
+        'Kandivali Mumbai'
+      ]
+    } else if (locLower.includes('jaipur')) {
+      localitiesPool = [
+        'Jaipur',
+        'Malviya Nagar Jaipur',
+        'Mansarovar Jaipur',
+        'Vaishali Nagar Jaipur',
+        'C Scheme Jaipur',
+        'Raja Park Jaipur',
+        'Tonk Road Jaipur',
+        'Sodala Jaipur',
+        'Jhotwara Jaipur'
+      ]
+    } else if (locLower.includes('lucknow')) {
+      localitiesPool = [
+        'Lucknow',
+        'Gomti Nagar Lucknow',
+        'Hazratganj Lucknow',
+        'Alambagh Lucknow',
+        'Indira Nagar Lucknow',
+        'Mahanagar Lucknow',
+        'Ashiyana Lucknow',
+        'Vikas Nagar Lucknow'
+      ]
+    } else if (locLower.includes('pune')) {
+      localitiesPool = [
+        'Pune',
+        'Kothrud Pune',
+        'Viman Nagar Pune',
+        'Baner Pune',
+        'Wakad Pune',
+        'Hinjewadi Pune',
+        'Hadapsar Pune',
+        'Shivaji Nagar Pune'
+      ]
+    } else if (locLower.includes('bangalore') || locLower.includes('bengaluru')) {
+      localitiesPool = [
+        'Bangalore',
+        'Koramangala Bangalore',
+        'Indiranagar Bangalore',
+        'HSR Layout Bangalore',
+        'Whitefield Bangalore',
+        'Jayanagar Bangalore',
+        'Electronic City Bangalore',
+        'Hebbal Bangalore'
+      ]
+    } else if (locLower.includes('ahmedabad')) {
+      localitiesPool = [
+        'Ahmedabad',
+        'SG Highway Ahmedabad',
+        'Vastrapur Ahmedabad',
+        'Navrangpura Ahmedabad',
+        'Prahlad Nagar Ahmedabad',
+        'Maninagar Ahmedabad',
+        'Bopal Ahmedabad'
       ]
     } else {
-      const raw = cleanLoc.split(/[&,]|(?:\band\b)/i).map(s => s.trim()).filter(s => s.length > 1 && s.toLowerCase() !== 'india')
-      localitiesPool = raw.length > 0 ? raw : [cleanLoc]
+      const primaryCity = cleanLoc.split(/[&,]/)[0].trim()
+      localitiesPool = [
+        cleanLoc,
+        `${primaryCity}`,
+        `Central ${primaryCity}`,
+        `North ${primaryCity}`,
+        `South ${primaryCity}`,
+        `East ${primaryCity}`,
+        `West ${primaryCity}`,
+        `${primaryCity} City Center`,
+        `${primaryCity} Market Area`
+      ]
     }
 
-    const currentCity = localitiesPool[currentTotal % localitiesPool.length]
+    // Offset query and city with attempt counter to guarantee every retry uses a new variation
+    const attemptOffset = typeof attempt === 'number' ? attempt : Math.floor(Math.random() * 10)
+    const cycleIndex = currentTotal + attemptOffset
+    const currentCity = localitiesPool[cycleIndex % localitiesPool.length]
 
     // Smart Query Extraction & Variations so Google Maps returns dozens of new places every batch
     const rawQuery = (campaign.search_query || 'business').toLowerCase()
@@ -221,6 +361,36 @@ export async function POST(req: Request) {
         'commercial property dealers',
         'flat and plot agents',
         'real estate agents'
+      ]
+    } else if (rawQuery.includes('library') || rawQuery.includes('reading room')) {
+      queryPool = [
+        'library',
+        'study library',
+        'public library',
+        'self study reading room',
+        'digital library',
+        'reading room library',
+        'student study library'
+      ]
+    } else if (rawQuery.includes('coaching') || rawQuery.includes('tuition') || rawQuery.includes('classes') || rawQuery.includes('institute') || rawQuery.includes('academy')) {
+      queryPool = [
+        'coaching institute',
+        'tuition classes',
+        'academy',
+        'training institute',
+        'education center',
+        'learning center',
+        'classes'
+      ]
+    } else if (rawQuery.includes('ca') || rawQuery.includes('chartered') || rawQuery.includes('accountant') || rawQuery.includes('tax') || rawQuery.includes('gst')) {
+      queryPool = [
+        'ca firm',
+        'chartered accountant',
+        'tax consultant',
+        'accounting firm',
+        'auditor',
+        'gst consultant',
+        'financial consultant'
       ]
     } else if (rawQuery.includes('cafe') || rawQuery.includes('restaurant') || rawQuery.includes('bakery') || rawQuery.includes('coffee')) {
       queryPool = [
@@ -238,15 +408,43 @@ export async function POST(req: Request) {
         'fitness center',
         'fitness club',
         'crossfit gym',
-        'yoga studio'
+        'yoga studio',
+        'unisex gym'
       ]
-    } else if (rawQuery.includes('doctor') || rawQuery.includes('clinic') || rawQuery.includes('hospital')) {
+    } else if (rawQuery.includes('doctor') || rawQuery.includes('clinic') || rawQuery.includes('hospital') || rawQuery.includes('dental') || rawQuery.includes('pathology') || rawQuery.includes('diagnostic')) {
       queryPool = [
         'clinic',
         'doctor clinic',
         'polyclinic',
         'health clinic',
-        'medical center'
+        'medical center',
+        'dental clinic',
+        'pathology lab',
+        'diagnostic center'
+      ]
+    } else if (rawQuery.includes('salon') || rawQuery.includes('beauty') || rawQuery.includes('spa') || rawQuery.includes('parlour')) {
+      queryPool = [
+        'beauty salon',
+        'unisex salon',
+        'hair salon',
+        'spa center',
+        'beauty parlour'
+      ]
+    } else if (rawQuery.includes('interior') || rawQuery.includes('architect') || rawQuery.includes('decor')) {
+      queryPool = [
+        'interior designer',
+        'architect',
+        'interior decorator',
+        'home decor store',
+        'modular kitchen'
+      ]
+    } else if (rawQuery.includes('hotel') || rawQuery.includes('resort')) {
+      queryPool = [
+        'hotel',
+        'resort',
+        'guest house',
+        'budget hotel',
+        'residency'
       ]
     } else {
       // If user typed multi-word query, decompose into constituent keywords
@@ -268,12 +466,12 @@ export async function POST(req: Request) {
       }
     }
 
-    const currentQuery = queryPool[Math.floor(currentTotal / 2) % queryPool.length]
+    const currentQuery = queryPool[(Math.floor(cycleIndex / 2) + attemptOffset) % queryPool.length]
 
     // 4. Request up to 35 places per run batch
-    const crawlLimit = Math.min(Math.max(needed, 10), 35)
+    const crawlLimit = Math.min(Math.max(needed, 15), 35)
 
-    console.log(`[Run Campaign ${campaignId}] Query: "${currentQuery}" in "${currentCity}" (Filter: ${apifyWebsiteFilter}, Limit: ${crawlLimit})`)
+    console.log(`[Run Campaign ${campaignId}] Batch attempt ${attempt}: "${currentQuery}" in "${currentCity}" (Filter: ${apifyWebsiteFilter}, Limit: ${crawlLimit})`)
     const places = await scrapeGooglePlacesViaApify(currentQuery, currentCity, crawlLimit, apifyWebsiteFilter)
     const importedLeads: any[] = []
     let updatedTotal = currentTotal

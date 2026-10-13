@@ -102,7 +102,7 @@ export default function CampaignsPage() {
         const res = await fetch('/api/campaigns/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaignId })
+          body: JSON.stringify({ campaignId, attempt: runsCount })
         })
         const data = await res.json()
 

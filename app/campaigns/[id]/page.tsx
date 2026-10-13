@@ -176,7 +176,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
         const res = await fetch('/api/campaigns/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaignId: campaign.id })
+          body: JSON.stringify({ campaignId: campaign.id, attempt: runsCount })
         })
         const data = await res.json()
 
