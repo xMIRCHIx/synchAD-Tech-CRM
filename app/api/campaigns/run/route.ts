@@ -202,11 +202,11 @@ export async function POST(req: Request) {
 
     const currentCity = localitiesPool[currentTotal % localitiesPool.length]
 
-    // Rich query variations so Google Maps returns dozens of new places every batch
-    const baseQuery = (campaign.search_query || 'business').toLowerCase()
+    // Smart Query Extraction & Variations so Google Maps returns dozens of new places every batch
+    const rawQuery = (campaign.search_query || 'business').toLowerCase()
     let queryPool: string[] = []
 
-    if (baseQuery.includes('real estate') || baseQuery.includes('property') || baseQuery.includes('builder')) {
+    if (rawQuery.includes('real estate') || rawQuery.includes('property') || rawQuery.includes('builder')) {
       queryPool = [
         'property dealers',
         'real estate builders',
@@ -217,14 +217,50 @@ export async function POST(req: Request) {
         'flat and plot agents',
         'real estate agents'
       ]
-    } else {
+    } else if (rawQuery.includes('cafe') || rawQuery.includes('restaurant') || rawQuery.includes('bakery') || rawQuery.includes('coffee')) {
       queryPool = [
-        baseQuery,
-        `${baseQuery} services`,
-        `${baseQuery} agency`,
-        `top ${baseQuery}`,
-        `${baseQuery} center`
+        'cafe',
+        'coffee shop',
+        'bakery',
+        'restaurant',
+        'bistro',
+        'fast food restaurant',
+        'tea cafe'
       ]
+    } else if (rawQuery.includes('gym') || rawQuery.includes('fitness')) {
+      queryPool = [
+        'gym',
+        'fitness center',
+        'fitness club',
+        'crossfit gym',
+        'yoga studio'
+      ]
+    } else if (rawQuery.includes('doctor') || rawQuery.includes('clinic') || rawQuery.includes('hospital')) {
+      queryPool = [
+        'clinic',
+        'doctor clinic',
+        'polyclinic',
+        'health clinic',
+        'medical center'
+      ]
+    } else {
+      // If user typed multi-word query, decompose into constituent keywords
+      const words = rawQuery.split(/[\s,]+/).filter((w: string) => w.length > 2 && !['near', 'me', 'the', 'and', 'for', 'best', 'top'].includes(w))
+      if (words.length > 1) {
+        queryPool = [
+          rawQuery,
+          ...words,
+          `${words[0]} store`,
+          `${words[0]} center`
+        ]
+      } else {
+        queryPool = [
+          rawQuery,
+          `${rawQuery} near me`,
+          `top ${rawQuery}`,
+          `${rawQuery} center`
+        ]
+      }
     }
 
     const currentQuery = queryPool[Math.floor(currentTotal / 2) % queryPool.length]
