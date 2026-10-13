@@ -10,6 +10,7 @@ import {
 import type { Lead, ClientInvoice, AgencyProfile } from '@/lib/types'
 import { useData } from '@/context/DataContext'
 import { numberToWordsINR } from '@/lib/numberToWords'
+import { generateInvoiceHtml, executePrint } from '@/lib/printTemplates'
 import '@/app/invoice-templates.css'
 
 interface InvoiceModalProps {
@@ -312,7 +313,38 @@ export default function InvoiceModal({
   }
 
   function handlePrint() {
-    window.print()
+    const html = generateInvoiceHtml({
+      agency,
+      client: {
+        name: clientName,
+        signatory: clientSignatory,
+        address: clientAddress,
+        gstin: clientGstin,
+        email: clientEmail,
+        phone: clientPhone
+      },
+      invoiceNumber,
+      issueDate,
+      dueDate,
+      placeOfSupply,
+      agreementRef,
+      projectName,
+      installmentLabel,
+      items,
+      milestones,
+      subtotal,
+      discount,
+      taxableValue,
+      taxPercent,
+      cgstAmount,
+      sgstAmount,
+      roundOff,
+      invoiceTotal,
+      amountReceived,
+      balanceDue,
+      amountInWords
+    })
+    executePrint(html)
   }
 
   function handleSendWhatsApp() {

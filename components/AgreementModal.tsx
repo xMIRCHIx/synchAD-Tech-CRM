@@ -9,6 +9,7 @@ import {
 import type { Lead, ClientAgreement, AgencyProfile } from '@/lib/types'
 import { useData } from '@/context/DataContext'
 import { numberToWordsINR } from '@/lib/numberToWords'
+import { generateAgreementHtml, executePrint } from '@/lib/printTemplates'
 import '@/app/invoice-templates.css'
 
 interface AgreementModalProps {
@@ -478,7 +479,46 @@ export default function AgreementModal({
   }
 
   function handlePrint() {
-    window.print()
+    const html = generateAgreementHtml({
+      agency,
+      client: {
+        name: clientName,
+        signatory: clientSignatory,
+        address: clientAddress,
+        gstin: clientGstin,
+        pan: clientPan,
+        email: clientEmail,
+        phone: clientPhone
+      },
+      agreementNumber,
+      effectiveDate,
+      agreementPlace,
+      agreementVersion,
+      projectName,
+      startDateStr,
+      estimatedCompletion,
+      dealVal,
+      gstPercent,
+      gstAmount,
+      totalPayable,
+      amountInWords,
+      inst1Share,
+      inst1Fee,
+      inst1Gst,
+      inst1Tot,
+      inst2Share,
+      inst2Fee,
+      inst2Gst,
+      inst2Tot,
+      inst3Share,
+      inst3Fee,
+      inst3Gst,
+      inst3Tot,
+      sections,
+      deliverables,
+      timeline: timelineWeeks
+    })
+    executePrint(html)
   }
 
   function handleSendWhatsApp() {
