@@ -188,7 +188,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
         await fetchCampaignAndLeads()
 
         // Check if goal reached
-        if (data.isFull || data.totalLeads >= data.maxLeads) {
+        if (data.isFull || data.isGoalReached || data.totalLeads >= data.maxLeads) {
           setToast({
             id: Date.now().toString(),
             title: 'Campaign Goal Reached! 🎯',

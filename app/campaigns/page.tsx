@@ -114,7 +114,7 @@ export default function CampaignsPage() {
         await refreshAll(true)
 
         // If goal met or reached max, stop loop
-        if (data.isFull || data.totalLeads >= data.maxLeads) {
+        if (data.isFull || data.isGoalReached || data.totalLeads >= data.maxLeads) {
           setToast({
             id: Date.now().toString(),
             title: 'Campaign Goal Reached! 🎯',

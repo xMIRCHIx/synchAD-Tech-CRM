@@ -122,7 +122,7 @@ export async function POST(req: Request) {
     const maxLeads = campaign.max_leads || 40
     const needed = Math.max(0, maxLeads - currentTotal)
 
-    // STRICT CHECK: If already at or above goal, do not add more leads!
+    // Check: If already at or above goal, do not add more leads
     if (needed <= 0) {
       await supabase.from('campaigns').update({ status: 'completed' }).eq('id', campaign.id)
       return NextResponse.json({
@@ -131,8 +131,13 @@ export async function POST(req: Request) {
         leadsImported: 0,
         totalLeads: currentTotal,
         maxLeads,
-        isFull: true
+        isGoalReached: true
       })
+    }
+
+    // Reset completed status if campaign was prematurely marked done but hasn't reached target
+    if (campaign.status === 'completed' && currentTotal < maxLeads) {
+      await supabase.from('campaigns').update({ status: 'active' }).eq('id', campaign.id)
     }
 
     // 3. Determine active website presence filters
@@ -312,9 +317,18 @@ export async function POST(req: Request) {
           notes: `Scraped via Apify: ${place.categoryName || campaign.niche || 'Business'}. Reviews: ${place.reviewsCount || 0}`
         }
 
+        // Check if phone already exists (avoid false-positive from upsert returning existing row)
+        const { data: existingLead } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('phone', leadItem.phone)
+          .maybeSingle()
+
+        if (existingLead) continue // skip duplicate - don't increment counter
+
         const { data: savedLead, error: lErr } = await supabase
           .from('leads')
-          .upsert(leadItem, { onConflict: 'phone' })
+          .insert(leadItem)
           .select()
           .single()
 
