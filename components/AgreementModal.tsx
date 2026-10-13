@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react'
 import {
   X, Printer, Check, MessageSquare, ShieldCheck,
-  Building, Phone, MapPin, Sparkles, Upload, Users, Edit3, Plus, Trash2
+  Building, Phone, MapPin, Sparkles, Upload, Users, Edit3, Plus, Trash2,
+  RefreshCw, RotateCcw, Eye
 } from 'lucide-react'
 import type { Lead, ClientAgreement, AgencyProfile } from '@/lib/types'
 import { useData } from '@/context/DataContext'
@@ -25,6 +26,17 @@ interface AgreementModalProps {
     target_deadline?: string | null
   }
   onAgreementCreated?: (agreement: ClientAgreement) => void
+}
+
+interface AgreementClause {
+  no: string
+  text: string
+}
+
+interface AgreementSection {
+  id: number
+  title: string
+  clauses: AgreementClause[]
 }
 
 interface DeliverableItem {
@@ -61,6 +73,152 @@ const DEFAULT_AGENCY: AgencyProfile & { pan?: string; city?: string; state?: str
   account_number: '50200084928192',
   ifsc_code: 'HDFC0001234'
 }
+
+const INITIAL_SECTIONS: AgreementSection[] = [
+  {
+    id: 1,
+    title: 'What this agreement covers',
+    clauses: [
+      { no: '1.1', text: 'The Provider will design, build and launch the website and related services described in Annexure A (the "Work") for the Client.' },
+      { no: '1.2', text: 'Annexure A (scope) and Annexure B (timeline) are part of this agreement. If they conflict with the clauses, the clauses apply.' }
+    ]
+  },
+  {
+    id: 2,
+    title: 'Timeline and delivery',
+    clauses: [
+      { no: '2.1', text: 'The Provider will follow the timeline in Annexure B. The dates assume the Client gives content, approvals and access on time (see clause 5).' },
+      { no: '2.2', text: 'If the Client is late, the dates move by the same number of days. The Provider is not in breach for delay caused by the Client.' },
+      { no: '2.3', text: 'The Work is delivered when the website is live on the Client’s domain, or when the Provider hands over the final files, whichever is agreed in Annexure A.' }
+    ]
+  },
+  {
+    id: 3,
+    title: 'Fees, taxes and payment',
+    clauses: [
+      { no: '3.1', text: 'The Client will pay the total price and instalments shown in the Price and payment box on page 1.' },
+      { no: '3.2', text: 'Work on each stage starts when the matching instalment is received in full. The Provider may pause the Work if an instalment is more than 7 days late.' },
+      { no: '3.3', text: 'GST at the rate in force is added to the fee. If the rate changes, the new rate applies from the date of change. Taxes withheld by the Client (TDS) must be deposited and a certificate shared.' },
+      { no: '3.4', text: 'Late payment attracts a charge of 1.5% per month on the overdue amount, counted per day.' },
+      { no: '3.5', text: 'Final handover, admin access and source files are released only after the last instalment is received.' }
+    ]
+  },
+  {
+    id: 4,
+    title: 'Provider responsibilities',
+    clauses: [
+      { no: '4.1', text: 'The Provider will carry out the Work with reasonable skill and care, using suitably skilled people.' },
+      { no: '4.2', text: 'The Provider will keep the Client informed on progress and share drafts for approval at the stages in Annexure B.' },
+      { no: '4.3', text: 'The Provider may use freelancers or subcontractors and remains responsible for their work.' }
+    ]
+  },
+  {
+    id: 5,
+    title: 'Client responsibilities',
+    clauses: [
+      { no: '5.1', text: 'The Client will give text, logos, photos, service details and other material in a usable form within 5 working days of the start date.' },
+      { no: '5.2', text: 'The Client will review drafts and reply within 3 working days. Silence for 7 days after a draft is shared counts as approval of that stage.' },
+      { no: '5.3', text: 'The Client confirms that it owns, or has the right to use, all material it supplies, and that the material does not break any law or third-party right.' },
+      { no: '5.4', text: 'The Client will arrange its own accounts for the domain, hosting and third-party tools, and give the Provider the access it needs.' }
+    ]
+  },
+  {
+    id: 6,
+    title: 'Revisions and change requests',
+    clauses: [
+      { no: '6.1', text: 'The price includes 2 rounds of revisions on the design and 1 round on the finished website. A round means one consolidated list of changes.' },
+      { no: '6.2', text: 'Anything beyond the scope or the included rounds is a change request. The Provider will quote its cost and time in writing. Work starts only after the Client agrees. Rate for extra work: ₹1,000 per hour.' }
+    ]
+  },
+  {
+    id: 7,
+    title: 'Ownership and use of the Work',
+    clauses: [
+      { no: '7.1', text: 'After the Client pays all amounts due, the Client owns the final website design, text and images made specifically for it.' },
+      { no: '7.2', text: 'The Provider keeps ownership of its pre-existing tools, code libraries, templates and know-how. The Client gets a non-exclusive licence to use them as part of the website.' },
+      { no: '7.3', text: 'Third-party items (fonts, plugins, themes, stock images) stay under their own licences. Their licence fees are the Client’s cost.' },
+      { no: '7.4', text: 'The Provider may show the finished website in its portfolio and case studies, unless the Client objects in writing.' }
+    ]
+  },
+  {
+    id: 8,
+    title: 'Confidentiality',
+    clauses: [
+      { no: '8.1', text: 'Each party will keep the other’s non-public business, pricing, customer and technical information confidential. It will use it only for this project.' },
+      { no: '8.2', text: 'This does not apply to information that is public, already known, or must be disclosed by law. This clause continues for 2 years after the agreement ends.' }
+    ]
+  },
+  {
+    id: 9,
+    title: 'Hosting, domain and third-party services',
+    clauses: [
+      { no: '9.1', text: 'Hosting, domain, email, SMS, payment gateway, WhatsApp and similar services are provided by third parties. Their fees and terms are separate from this agreement.' },
+      { no: '9.2', text: 'The Provider is not responsible for outages, price changes or policy changes of third-party services.' }
+    ]
+  },
+  {
+    id: 10,
+    title: 'Support and warranty',
+    clauses: [
+      { no: '10.1', text: 'For 30 days after go-live, the Provider will fix bugs in the delivered Work free of charge. This does not cover new features, content changes or problems caused by the Client or third parties.' },
+      { no: '10.2', text: 'Support after 30 days is available under a separate written plan or at the rate in clause 6.2.' },
+      { no: '10.3', text: 'The Provider does not promise search rankings, traffic, leads or sales. These depend on many things outside its control.' }
+    ]
+  },
+  {
+    id: 11,
+    title: 'Limit of liability',
+    clauses: [
+      { no: '11.1', text: 'Neither party is liable for indirect or consequential loss, including lost profit or lost business.' },
+      { no: '11.2', text: 'The total liability of the Provider under this agreement is limited to the fees the Client has actually paid for the Work.' },
+      { no: '11.3', text: 'Nothing here limits liability that cannot be limited by law, such as fraud.' }
+    ]
+  },
+  {
+    id: 12,
+    title: 'Term and ending the agreement',
+    clauses: [
+      { no: '12.1', text: 'This agreement starts on the date above and runs until the Work is delivered and all payments are made.' },
+      { no: '12.2', text: 'Either party may end it with 7 days’ written notice. Either party may end it at once if the other breaks a material term and does not fix it within 7 days of written notice.' },
+      { no: '12.3', text: 'On ending, the Client pays for all Work done up to the end date. Any advance paid is first set against this amount. The Provider refunds the unused balance within 15 days. Completed work and files are handed over once all dues are paid.' },
+      { no: '12.4', text: 'Clauses on payment, ownership, confidentiality, liability and disputes continue after the agreement ends.' }
+    ]
+  },
+  {
+    id: 13,
+    title: 'Events beyond control',
+    clauses: [
+      { no: '13.1', text: 'Neither party is liable for delay caused by events beyond its reasonable control, such as natural disasters, power or internet failure, government orders, strikes or war. The affected party will tell the other promptly and resume as soon as it can.' }
+    ]
+  },
+  {
+    id: 14,
+    title: 'Disputes and governing law',
+    clauses: [
+      { no: '14.1', text: 'The parties will first try to settle any dispute by talking, within 15 days of written notice of the dispute.' },
+      { no: '14.2', text: 'If it is not settled, the dispute goes to arbitration by a sole arbitrator under the Arbitration and Conciliation Act, 1996. The seat and venue is the Provider\'s registered city. The language is English.' },
+      { no: '14.3', text: 'This agreement is governed by the laws of India. Subject to clause 14.2, the courts at the Provider\'s registered city have exclusive jurisdiction.' }
+    ]
+  },
+  {
+    id: 15,
+    title: 'Notices',
+    clauses: [
+      { no: '15.1', text: 'Notices must be in writing and sent to the email or address on page 1. An email is treated as received on the next working day. A letter by courier is treated as received after 3 working days.' }
+    ]
+  },
+  {
+    id: 16,
+    title: 'General',
+    clauses: [
+      { no: '16.1', text: 'This agreement is the full agreement between the parties on this project. It replaces earlier talks and messages.' },
+      { no: '16.2', text: 'Changes must be in writing and signed (or accepted by email) by both parties.' },
+      { no: '16.3', text: 'If a clause is found invalid, the rest of the agreement still applies.' },
+      { no: '16.4', text: 'Neither party may transfer its rights or duties without the other’s written consent.' },
+      { no: '16.5', text: 'The parties may sign in counterparts and by electronic signature. Each is valid as an original.' }
+    ]
+  }
+]
 
 export default function AgreementModal({
   lead,
@@ -100,86 +258,33 @@ export default function AgreementModal({
   const [dealVal, setDealVal] = useState<number>(48000)
   const [gstPercent, setGstPercent] = useState<number>(18)
 
+  // Dynamic Structured Clauses (Editable & AI generated)
+  const [sections, setSections] = useState<AgreementSection[]>(INITIAL_SECTIONS)
+
   // Scope Deliverables
   const [deliverables, setDeliverables] = useState<DeliverableItem[]>([
-    {
-      id: 'd-1',
-      title: 'Website design',
-      description: 'Custom design for 5 pages: Home, About, Services, Gallery, Contact. Desktop, tablet and mobile.',
-      included: true
-    },
-    {
-      id: 'd-2',
-      title: 'Website development',
-      description: 'Fast, mobile friendly build. SSL set-up. Basic speed optimisation. Cross-browser testing.',
-      included: true
-    },
-    {
-      id: 'd-3',
-      title: 'Contact and booking form',
-      description: 'Appointment request form with email and WhatsApp alerts. Click-to-call and WhatsApp buttons.',
-      included: true
-    },
-    {
-      id: 'd-4',
-      title: 'Google Business Profile',
-      description: 'Create or fix the profile, add services, hours, photos and categories.',
-      included: true
-    },
-    {
-      id: 'd-5',
-      title: 'Basic on-page SEO',
-      description: 'Page titles, descriptions, headings, sitemap, Google Search Console and Analytics set-up. 10 target keywords.',
-      included: true
-    },
-    {
-      id: 'd-6',
-      title: 'Training and handover',
-      description: 'One 30 minute video call on how to update the site. Admin access after final payment.',
-      included: true
-    },
-    {
-      id: 'd-7',
-      title: 'Revisions',
-      description: '2 rounds on design, 1 round on the finished website.',
-      included: true
-    },
-    {
-      id: 'd-8',
-      title: 'Free bug-fix support',
-      description: '30 days after go-live.',
-      included: true
-    }
+    { id: 'd-1', title: 'Website design', description: 'Custom design for 5 pages: Home, About, Services, Gallery, Contact. Desktop, tablet and mobile.', included: true },
+    { id: 'd-2', title: 'Website development', description: 'Fast, mobile friendly build. SSL set-up. Basic speed optimisation. Cross-browser testing.', included: true },
+    { id: 'd-3', title: 'Contact and booking form', description: 'Appointment request form with email and WhatsApp alerts. Click-to-call and WhatsApp buttons.', included: true },
+    { id: 'd-4', title: 'Google Business Profile', description: 'Create or fix the profile, add services, hours, photos and categories.', included: true },
+    { id: 'd-5', title: 'Basic on-page SEO', description: 'Page titles, descriptions, headings, sitemap, Google Search Console and Analytics set-up. 10 target keywords.', included: true },
+    { id: 'd-6', title: 'Training and handover', description: 'One 30 minute video call on how to update the site. Admin access after final payment.', included: true },
+    { id: 'd-7', title: 'Revisions', description: '2 rounds on design, 1 round on the finished website.', included: true },
+    { id: 'd-8', title: 'Free bug-fix support', description: '30 days after go-live.', included: true }
   ])
 
   // Timeline Schedule
   const [timelineWeeks, setTimelineWeeks] = useState<TimelineItem[]>([
-    {
-      week: '1',
-      dates: '20 to 26 Oct 2026',
-      description: 'Kick-off call. Client sends content and brand files. Provider plans pages.',
-      paymentLink: 'Instalment 1 received'
-    },
-    {
-      week: '2',
-      dates: '27 Oct to 2 Nov 2026',
-      description: 'Design draft shared. Client reviews and approves.',
-      paymentLink: 'Instalment 2 on design approval'
-    },
-    {
-      week: '3',
-      dates: '3 to 9 Nov 2026',
-      description: 'Development, forms and Google Business Profile.',
-      paymentLink: 'None'
-    },
-    {
-      week: '4',
-      dates: '10 to 17 Nov 2026',
-      description: 'Testing, fixes, final review, go-live and training.',
-      paymentLink: 'Instalment 3 before go-live'
-    }
+    { week: '1', dates: '20 to 26 Oct 2026', description: 'Kick-off call. Client sends content and brand files. Provider plans pages.', paymentLink: 'Instalment 1 received' },
+    { week: '2', dates: '27 Oct to 2 Nov 2026', description: 'Design draft shared. Client reviews and approves.', paymentLink: 'Instalment 2 on design approval' },
+    { week: '3', dates: '3 to 9 Nov 2026', description: 'Development, forms and Google Business Profile.', paymentLink: 'None' },
+    { week: '4', dates: '10 to 17 Nov 2026', description: 'Testing, fixes, final review, go-live and training.', paymentLink: 'Instalment 3 before go-live' }
   ])
 
+  // AI & Edit states
+  const [isEditing, setIsEditing] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
 
   // Load Agency Profile from LocalStorage
@@ -283,6 +388,95 @@ export default function AgreementModal({
     }
   }
 
+  // AI Generation Function (Outputs clean structured JSON, never raw markdown with ##)
+  async function handleGenerateWithAI() {
+    setIsGenerating(true)
+    try {
+      const res = await fetch('/api/agreements/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: selectedLeadId || null,
+          clientName: clientName || 'Client Representative',
+          businessName: clientName,
+          phone: clientPhone,
+          address: clientAddress,
+          dealValue: dealVal,
+          advancePaid: inst1Tot,
+          balanceDue: totalPayable - inst1Tot,
+          serviceType: projectName,
+          targetDeadline: estimatedCompletion,
+          partner1Name: agency.representative,
+          partner1Role: agency.partner1_role,
+          partner2Name: agency.partner2_name,
+          partner2Role: agency.partner2_role,
+          hasDualPartners: agency.has_dual_signatories ?? true,
+          customInstruction: aiPrompt
+        })
+      })
+
+      const data = await res.json()
+      if (data.data?.sections && Array.isArray(data.data.sections)) {
+        setSections(data.data.sections)
+        if (data.data.deliverables) setDeliverables(data.data.deliverables)
+        if (data.data.timeline) setTimelineWeeks(data.data.timeline)
+      }
+      if (data.agreementNumber) {
+        setAgreementNumber(data.agreementNumber)
+      }
+    } catch (err) {
+      console.error('AI draft error:', err)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // Clause editing functions
+  function handleUpdateClauseText(sectionId: number, clauseIndex: number, newText: string) {
+    setSections(prev => prev.map(sec => {
+      if (sec.id === sectionId) {
+        const nextClauses = [...sec.clauses]
+        nextClauses[clauseIndex] = { ...nextClauses[clauseIndex], text: newText }
+        return { ...sec, clauses: nextClauses }
+      }
+      return sec
+    }))
+  }
+
+  function handleUpdateSectionTitle(sectionId: number, newTitle: string) {
+    setSections(prev => prev.map(sec => sec.id === sectionId ? { ...sec, title: newTitle } : sec))
+  }
+
+  function handleAddClause(sectionId: number) {
+    setSections(prev => prev.map(sec => {
+      if (sec.id === sectionId) {
+        const count = sec.clauses.length + 1
+        const newClause: AgreementClause = {
+          no: `${sec.id}.${count}`,
+          text: 'New contract clause specification.'
+        }
+        return { ...sec, clauses: [...sec.clauses, newClause] }
+      }
+      return sec
+    }))
+  }
+
+  function handleDeleteClause(sectionId: number, clauseIndex: number) {
+    setSections(prev => prev.map(sec => {
+      if (sec.id === sectionId) {
+        const filtered = sec.clauses.filter((_, idx) => idx !== clauseIndex)
+        return { ...sec, clauses: filtered }
+      }
+      return sec
+    }))
+  }
+
+  function handleResetClauses() {
+    if (confirm('Reset all clauses to standard lawyer-approved terms?')) {
+      setSections(INITIAL_SECTIONS)
+    }
+  }
+
   function handlePrint() {
     window.print()
   }
@@ -326,7 +520,7 @@ Thank you for choosing ${agency.name}!`
           leadId: selectedLeadId || null,
           agreementNumber,
           title: projectName,
-          content: `Website & Digital Services Agreement: Total Value ₹${totalPayable}`,
+          content: JSON.stringify({ sections, deliverables, timeline: timelineWeeks }),
           agencySignatory: agencySig,
           clientSignatory: clientName,
           client_name: clientName,
@@ -365,14 +559,32 @@ Thank you for choosing ${agency.name}!`
                 <span className="text-xs px-2 py-0.5 rounded-md font-mono bg-purple-950 text-purple-300 border border-purple-800 font-bold">
                   {agreementNumber}
                 </span>
+                {isEditing && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase tracking-wider animate-pulse">
+                    Edit Mode Active
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-stone-400">
-                Formal legal contract with structured clauses, payment schedule, dual signatures, and annexures.
+                Official lawyer-grade contract. Generate with AI, customize clauses inline, and print.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Edit Mode Toggle Button */}
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-md ${
+                isEditing
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white ring-2 ring-amber-400'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700'
+              }`}
+            >
+              {isEditing ? <Eye size={14} /> : <Edit3 size={14} />}
+              {isEditing ? 'Preview Clean Sheet' : 'Edit Clauses'}
+            </button>
+
             <button
               onClick={handleSaveAgreement}
               className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
@@ -412,6 +624,42 @@ Thank you for choosing ${agency.name}!`
           {/* LEFT: Controls & Form Configuration (Hidden on Print) */}
           <div className="w-full lg:w-[460px] border-b lg:border-b-0 lg:border-r border-stone-800 bg-stone-900 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs text-stone-200 print:hidden BLzxva_noPrint shrink-0">
             
+            {/* 0. AI CONTRACT DRAFTER */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-950/60 to-stone-950 border border-purple-800/50 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-purple-300 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-amber-400" /> AI Contract Drafter
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResetClauses}
+                  title="Reset to default legal clauses"
+                  className="text-[10px] text-stone-400 hover:text-stone-200 flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw size={11} /> Reset Defaults
+                </button>
+              </div>
+              <p className="text-[11px] text-stone-300 leading-relaxed">
+                Describe special contract requirements. Google Gemini will draft or tailor all 16 clauses and annexures automatically into lawyer-grade language.
+              </p>
+              <textarea
+                rows={2}
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                placeholder="e.g. Include 60 days bug warranty, 50% advance & 50% on launch, and medical privacy compliance..."
+                className="w-full p-2 rounded-xl border border-purple-700/60 bg-stone-900/90 text-white text-xs outline-none focus:ring-1 focus:ring-purple-500"
+              />
+              <button
+                type="button"
+                onClick={handleGenerateWithAI}
+                disabled={isGenerating}
+                className="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
+              >
+                <RefreshCw size={13} className={isGenerating ? 'animate-spin' : ''} />
+                {isGenerating ? 'Gemini is Drafting Legal Clauses...' : '✨ Draft / Customize Clauses with AI'}
+              </button>
+            </div>
+
             {/* 1. Client Details */}
             <div className="p-3.5 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
               <span className="font-extrabold text-stone-300 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
@@ -832,258 +1080,66 @@ Thank you for choosing ${agency.name}!`
                 </div>
               </div>
 
-              {/* SECTIONS 1 TO 16 (CLEAN, PROFESSIONAL LEGAL CLAUSES - NO RAW ##) */}
-              <section>
-                <h2 className="Uvh_Ra_sec">1. What this agreement covers</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">1.1</span>
-                  <span>The Provider will design, build and launch the website and related services described in Annexure A (the &quot;Work&quot;) for the Client.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">1.2</span>
-                  <span>Annexure A (scope) and Annexure B (timeline) are part of this agreement. If they conflict with the clauses, the clauses apply.</span>
-                </div>
-              </section>
+              {/* DYNAMIC SECTIONS & CLAUSES (CLEAN STRUCTURED LEGAL FORMAT - ZERO ##) */}
+              {sections.map(section => (
+                <section key={section.id} className="group relative">
+                  <div className="flex items-center justify-between">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={section.title}
+                        onChange={e => handleUpdateSectionTitle(section.id, e.target.value)}
+                        className="Uvh_Ra_sec flex-1 px-1 py-0.5 rounded border border-purple-400 bg-purple-50 text-slate-900 font-bold"
+                      />
+                    ) : (
+                      <h2 className="Uvh_Ra_sec">
+                        {section.id}. {section.title}
+                      </h2>
+                    )}
 
-              <section>
-                <h2 className="Uvh_Ra_sec">2. Timeline and delivery</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">2.1</span>
-                  <span>The Provider will follow the timeline in Annexure B. The dates assume the Client gives content, approvals and access on time (see clause 5).</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">2.2</span>
-                  <span>If the Client is late, the dates move by the same number of days. The Provider is not in breach for delay caused by the Client.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">2.3</span>
-                  <span>The Work is delivered when the website is live on the Client’s domain, or when the Provider hands over the final files, whichever is agreed in Annexure A.</span>
-                </div>
-              </section>
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddClause(section.id)}
+                        className="text-[10px] px-2 py-0.5 rounded bg-purple-600 text-white font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus size={10} /> Add Clause
+                      </button>
+                    )}
+                  </div>
 
-              <section>
-                <h2 className="Uvh_Ra_sec">3. Fees, taxes and payment</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">3.1</span>
-                  <span>The Client will pay the total price and instalments shown in the Price and payment box on page 1.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">3.2</span>
-                  <span>Work on each stage starts when the matching instalment is received in full. The Provider may pause the Work if an instalment is more than 7 days late.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">3.3</span>
-                  <span>GST at the rate in force is added to the fee. If the rate changes, the new rate applies from the date of change. Taxes withheld by the Client (TDS) must be deposited and a certificate shared.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">3.4</span>
-                  <span>Late payment attracts a charge of 1.5% per month on the overdue amount, counted per day.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">3.5</span>
-                  <span>Final handover, admin access and source files are released only after the last instalment is received.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">4. Provider responsibilities</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">4.1</span>
-                  <span>The Provider will carry out the Work with reasonable skill and care, using suitably skilled people.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">4.2</span>
-                  <span>The Provider will keep the Client informed on progress and share drafts for approval at the stages in Annexure B.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">4.3</span>
-                  <span>The Provider may use freelancers or subcontractors and remains responsible for their work.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">5. Client responsibilities</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">5.1</span>
-                  <span>The Client will give text, logos, photos, service details and other material in a usable form within 5 working days of the start date.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">5.2</span>
-                  <span>The Client will review drafts and reply within 3 working days. Silence for 7 days after a draft is shared counts as approval of that stage.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">5.3</span>
-                  <span>The Client confirms that it owns, or has the right to use, all material it supplies, and that the material does not break any law or third-party right.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">5.4</span>
-                  <span>The Client will arrange its own accounts for the domain, hosting and third-party tools, and give the Provider the access it needs.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">6. Revisions and change requests</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">6.1</span>
-                  <span>The price includes 2 rounds of revisions on the design and 1 round on the finished website. A round means one consolidated list of changes.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">6.2</span>
-                  <span>Anything beyond the scope or the included rounds is a change request. The Provider will quote its cost and time in writing. Work starts only after the Client agrees. Rate for extra work: ₹1,000 per hour.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">7. Ownership and use of the Work</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">7.1</span>
-                  <span>After the Client pays all amounts due, the Client owns the final website design, text and images made specifically for it.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">7.2</span>
-                  <span>The Provider keeps ownership of its pre-existing tools, code libraries, templates and know-how. The Client gets a non-exclusive licence to use them as part of the website.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">7.3</span>
-                  <span>Third-party items (fonts, plugins, themes, stock images) stay under their own licences. Their licence fees are the Client’s cost.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">7.4</span>
-                  <span>The Provider may show the finished website in its portfolio and case studies, unless the Client objects in writing.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">8. Confidentiality</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">8.1</span>
-                  <span>Each party will keep the other’s non-public business, pricing, customer and technical information confidential. It will use it only for this project.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">8.2</span>
-                  <span>This does not apply to information that is public, already known, or must be disclosed by law. This clause continues for 2 years after the agreement ends.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">9. Hosting, domain and third-party services</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">9.1</span>
-                  <span>Hosting, domain, email, SMS, payment gateway, WhatsApp and similar services are provided by third parties. Their fees and terms are separate from this agreement.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">9.2</span>
-                  <span>The Provider is not responsible for outages, price changes or policy changes of third-party services.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">10. Support and warranty</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">10.1</span>
-                  <span>For 30 days after go-live, the Provider will fix bugs in the delivered Work free of charge. This does not cover new features, content changes or problems caused by the Client or third parties.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">10.2</span>
-                  <span>Support after 30 days is available under a separate written plan or at the rate in clause 6.2.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">10.3</span>
-                  <span>The Provider does not promise search rankings, traffic, leads or sales. These depend on many things outside its control.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">11. Limit of liability</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">11.1</span>
-                  <span>Neither party is liable for indirect or consequential loss, including lost profit or lost business.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">11.2</span>
-                  <span>The total liability of the Provider under this agreement is limited to the fees the Client has actually paid for the Work.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">11.3</span>
-                  <span>Nothing here limits liability that cannot be limited by law, such as fraud.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">12. Term and ending the agreement</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">12.1</span>
-                  <span>This agreement starts on the date above and runs until the Work is delivered and all payments are made.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">12.2</span>
-                  <span>Either party may end it with 7 days’ written notice. Either party may end it at once if the other breaks a material term and does not fix it within 7 days of written notice.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">12.3</span>
-                  <span>On ending, the Client pays for all Work done up to the end date. Any advance paid is first set against this amount. The Provider refunds the unused balance within 15 days. Completed work and files are handed over once all dues are paid.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">12.4</span>
-                  <span>Clauses on payment, ownership, confidentiality, liability and disputes continue after the agreement ends.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">13. Events beyond control</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">13.1</span>
-                  <span>Neither party is liable for delay caused by events beyond its reasonable control, such as natural disasters, power or internet failure, government orders, strikes or war. The affected party will tell the other promptly and resume as soon as it can.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">14. Disputes and governing law</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">14.1</span>
-                  <span>The parties will first try to settle any dispute by talking, within 15 days of written notice of the dispute.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">14.2</span>
-                  <span>If it is not settled, the dispute goes to arbitration by a sole arbitrator under the Arbitration and Conciliation Act, 1996. The seat and venue is {agreementPlace}. The language is English.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">14.3</span>
-                  <span>This agreement is governed by the laws of India. Subject to clause 14.2, the courts at {agreementPlace} have exclusive jurisdiction.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">15. Notices</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">15.1</span>
-                  <span>Notices must be in writing and sent to the email or address on page 1. An email is treated as received on the next working day. A letter by courier is treated as received after 3 working days.</span>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="Uvh_Ra_sec">16. General</h2>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">16.1</span>
-                  <span>This agreement is the full agreement between the parties on this project. It replaces earlier talks and messages.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">16.2</span>
-                  <span>Changes must be in writing and signed (or accepted by email) by both parties.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">16.3</span>
-                  <span>If a clause is found invalid, the rest of the agreement still applies.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">16.4</span>
-                  <span>Neither party may transfer its rights or duties without the other’s written consent.</span>
-                </div>
-                <div className="Uvh_Ra_clause">
-                  <span className="Uvh_Ra_clauseNo">16.5</span>
-                  <span>The parties may sign in counterparts and by electronic signature. Each is valid as an original.</span>
-                </div>
-              </section>
+                  <div className="space-y-1 mt-1">
+                    {section.clauses.map((clause, cIdx) => (
+                      <div key={clause.no || cIdx} className="Uvh_Ra_clause items-start">
+                        <span className="Uvh_Ra_clauseNo pt-0.5">{clause.no}</span>
+                        
+                        {isEditing ? (
+                          <div className="flex items-start gap-1 flex-1">
+                            <textarea
+                              rows={2}
+                              value={clause.text}
+                              onChange={e => handleUpdateClauseText(section.id, cIdx, e.target.value)}
+                              className="flex-1 p-1.5 rounded border border-slate-300 font-sans text-xs text-slate-800 bg-white"
+                            />
+                            {section.clauses.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteClause(section.id, cIdx)}
+                                className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                                title="Delete clause"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="Uvh_Ra_p">{clause.text}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
 
               {/* SIGNATURES: DUAL PARTNERS + CLIENT */}
               <h2 className="Uvh_Ra_sec">Signatures</h2>
@@ -1152,8 +1208,35 @@ Thank you for choosing ${agency.name}!`
                       <tr key={d.id}>
                         <td>{idx + 1}</td>
                         <td>
-                          <b>{d.title}</b>
-                          <small>{d.description}</small>
+                          {isEditing ? (
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={d.title}
+                                onChange={e => {
+                                  const next = [...deliverables]
+                                  next[idx] = { ...d, title: e.target.value }
+                                  setDeliverables(next)
+                                }}
+                                className="w-full px-1.5 py-0.5 rounded border border-slate-300 font-bold text-xs"
+                              />
+                              <input
+                                type="text"
+                                value={d.description}
+                                onChange={e => {
+                                  const next = [...deliverables]
+                                  next[idx] = { ...d, description: e.target.value }
+                                  setDeliverables(next)
+                                }}
+                                className="w-full px-1.5 py-0.5 rounded border border-slate-300 text-[11px]"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <b>{d.title}</b>
+                              <small>{d.description}</small>
+                            </>
+                          )}
                         </td>
                         <td>
                           <span className="Uvh_Ra_chk"></span>Yes
@@ -1203,11 +1286,41 @@ Thank you for choosing ${agency.name}!`
                     </tr>
                   </thead>
                   <tbody>
-                    {timelineWeeks.map(tw => (
+                    {timelineWeeks.map((tw, idx) => (
                       <tr key={tw.week}>
                         <td>Week {tw.week}</td>
-                        <td>{tw.dates}</td>
-                        <td>{tw.description}</td>
+                        <td>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={tw.dates}
+                              onChange={e => {
+                                const next = [...timelineWeeks]
+                                next[idx] = { ...tw, dates: e.target.value }
+                                setTimelineWeeks(next)
+                              }}
+                              className="w-full px-1 py-0.5 rounded border border-slate-300 text-xs"
+                            />
+                          ) : (
+                            tw.dates
+                          )}
+                        </td>
+                        <td>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={tw.description}
+                              onChange={e => {
+                                const next = [...timelineWeeks]
+                                next[idx] = { ...tw, description: e.target.value }
+                                setTimelineWeeks(next)
+                              }}
+                              className="w-full px-1 py-0.5 rounded border border-slate-300 text-xs"
+                            />
+                          ) : (
+                            tw.description
+                          )}
+                        </td>
                         <td>{tw.paymentLink}</td>
                       </tr>
                     ))}
