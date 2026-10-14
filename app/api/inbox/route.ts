@@ -24,9 +24,6 @@ function calculateLeadScore(lead: any, audit?: any): number {
   return Math.min(99, Math.max(25, score))
 }
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 export async function GET() {
   try {
     const supabase = createAdminClient()
