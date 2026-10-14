@@ -17,7 +17,7 @@ interface DealDossierModalProps {
 const PRESET_FEATURES = [
   '⚡ Next.js Ultra-Fast Architecture',
   '📱 100% Mobile Responsive Layout',
-  '💬 1-Tap WhatsApp Booking Engine',
+  '💬 WhatsApp Lead & Inquiry Integration',
   '📍 Google Maps & Local SEO Setup',
   '🔒 SSL Certificate & Domain Linking',
   '💳 UPI & Online Payment Gateway',
@@ -35,8 +35,8 @@ export default function DealDossierModal({
   const [advancePaid, setAdvancePaid] = useState<number>(17500)
   const [currency, setCurrency] = useState<'INR' | 'USD'>('INR')
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('upi')
-  const [serviceType, setServiceType] = useState('Custom Website + WhatsApp Booking Funnel')
-  const [projectScope, setProjectScope] = useState('Responsive modern website, mobile speed optimization, and 1-tap WhatsApp booking flow.')
+  const [serviceType, setServiceType] = useState('Custom Website + WhatsApp Lead Funnel')
+  const [projectScope, setProjectScope] = useState('Responsive modern website, mobile speed optimization, and direct WhatsApp client inquiry flow.')
   const [targetDeadline, setTargetDeadline] = useState('')
   const [stage, setStage] = useState<DealStage>('closing')
 
@@ -44,7 +44,7 @@ export default function DealDossierModal({
   const [features, setFeatures] = useState<string[]>([
     '⚡ Next.js Ultra-Fast Architecture',
     '📱 100% Mobile Responsive Layout',
-    '💬 1-Tap WhatsApp Booking Engine',
+    '💬 WhatsApp Lead & Inquiry Integration',
     '📍 Google Maps & Local SEO Setup'
   ])
   const [customFeatureInput, setCustomFeatureInput] = useState('')

@@ -9,6 +9,13 @@ import {
   UserCheck, User, Compass, HelpCircle, ArrowUpRight, Edit2, Save
 } from 'lucide-react'
 
+import { getStrategicWhyPitch } from '@/lib/nichePitch'
+import {
+  normalizeLeadStatus,
+  getLeadStatusBadgeStyle,
+  CANONICAL_STATUS_OPTIONS
+} from '@/lib/statusHelper'
+
 interface LeadDetailPanelProps {
   lead: Lead | null
   onClose: () => void
@@ -42,6 +49,55 @@ export default function LeadDetailPanel({
   const [isEditingOwner, setIsEditingOwner] = useState(false)
   const [isSavingOwner, setIsSavingOwner] = useState(false)
 
+  // Personal Touch: Sender Persona State (Aryan / Dewansh / Custom / None)
+  const [senderPersona, setSenderPersona] = useState<'aryan' | 'dewansh' | 'custom' | 'none'>('aryan')
+  const [customSenderName, setCustomSenderName] = useState('')
+  const [includeSenderName, setIncludeSenderName] = useState(true)
+
+  useEffect(() => {
+    try {
+      const savedPersona = localStorage.getItem('synchad_sender_persona') as any
+      const savedName = localStorage.getItem('synchad_custom_sender_name')
+      const savedInclude = localStorage.getItem('synchad_include_sender_name')
+      if (savedPersona && ['aryan', 'dewansh', 'custom', 'none'].includes(savedPersona)) {
+        setSenderPersona(savedPersona)
+      }
+      if (savedName) setCustomSenderName(savedName)
+      if (savedInclude !== null) setIncludeSenderName(savedInclude === 'true')
+    } catch {}
+  }, [])
+
+  const handleSelectPersona = (persona: 'aryan' | 'dewansh' | 'custom' | 'none') => {
+    setSenderPersona(persona)
+    try {
+      localStorage.setItem('synchad_sender_persona', persona)
+      if (persona === 'none') {
+        setIncludeSenderName(false)
+        localStorage.setItem('synchad_include_sender_name', 'false')
+      } else {
+        setIncludeSenderName(true)
+        localStorage.setItem('synchad_include_sender_name', 'true')
+      }
+    } catch {}
+    setCustomPitch(null)
+  }
+
+  const handleCustomNameChange = (val: string) => {
+    setCustomSenderName(val)
+    try {
+      localStorage.setItem('synchad_custom_sender_name', val)
+    } catch {}
+    setCustomPitch(null)
+  }
+
+  const effectiveSenderName = !includeSenderName || senderPersona === 'none'
+    ? null
+    : senderPersona === 'dewansh'
+    ? 'Dewansh'
+    : senderPersona === 'custom'
+    ? (customSenderName.trim() || 'Representative')
+    : 'Aryan'
+
   useEffect(() => {
     if (lead) {
       setOwnerName(lead.owner_name || '')
@@ -71,75 +127,25 @@ export default function LeadDetailPanel({
     rawUrl.toLowerCase() !== 'null' &&
     rawUrl.toLowerCase() !== 'undefined'
   )
-  const isSocial = hasRealWebsite && /instagram\.com|facebook\.com|fb\.com|linkedin\.com/i.test(rawUrl)
 
-  // Dynamic Strategy Reasoning depending on website existence (High Contrast Palettes)
-  const getStrategicWhyPitch = () => {
-    const rawBiz = lead.business_name || ''
-    const isDirectContact = rawBiz.toLowerCase().startsWith('direct contact')
-    const cleanBiz = isDirectContact ? '' : rawBiz
-    const recipientName = ownerName?.trim() || cleanBiz
-    const greeting = recipientName ? `Hey ${recipientName}!` : 'Hey there!'
+  const strategy = getStrategicWhyPitch({
+    businessName: lead.business_name,
+    ownerName,
+    niche: lead.campaigns?.niche,
+    address: lead.address,
+    websiteUrl: lead.website_url,
+    siteState: lead.site_state,
+    googleRating: lead.google_rating,
+    senderName: effectiveSenderName,
+    includeSenderName
+  })
 
-    const rawCat = lead.campaigns?.niche
-    const cat = rawCat && rawCat !== 'Local Business' ? rawCat : null
-    const searchTarget = cat ? `"${cat}"` : `businesses like "${cleanBiz || 'yours'}" or services nearby`
-
-    if (!hasRealWebsite || lead.site_state === 'none') {
-      return {
-        situation: 'NO WEBSITE DETECTED',
-        angle: 'Direct Customer Leak to Online Rivals',
-        badgeColor: 'bg-amber-100 dark:bg-amber-950/70 border-2 border-amber-300 dark:border-amber-600',
-        tagBg: 'bg-amber-500 text-white font-black shadow-xs',
-        textColor: 'text-amber-950 dark:text-amber-100',
-        whyPitch: `This business has an active Google Maps profile with customer reviews, but ZERO official website or digital portal. When local customers search for ${searchTarget}, they click competitor profiles who provide instant 1-tap WhatsApp booking and services.`,
-        recommendedSolution: `Pitch a modern high-converting website with 1-tap WhatsApp booking + Google Maps boost. Close via quick Zoom demo / call.`,
-        defaultHook: `${greeting} Impressed by your Google Maps presence and reviews! Noticed you don't have an official website or booking page linked yet, so many local clients end up choosing competitors who have 1-tap booking. We build modern, high-converting websites with instant WhatsApp booking for businesses. If you'd like, I can share a few of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
-      }
-    } else if (isSocial) {
-      return {
-        situation: 'SOCIAL MEDIA LINK ONLY',
-        angle: 'Social Page Lacks High-Converting Website Authority',
-        badgeColor: 'bg-indigo-100 dark:bg-indigo-950/70 border-2 border-indigo-300 dark:border-indigo-600',
-        tagBg: 'bg-indigo-600 text-white font-black shadow-xs',
-        textColor: 'text-indigo-950 dark:text-indigo-100',
-        whyPitch: `Their Google Maps profile links to a social media handle (${rawUrl}) instead of a dedicated business website, which limits customer conversion and Google ranking.`,
-        recommendedSolution: `Pitch a dedicated business website with direct WhatsApp integration and portfolio showcase.`,
-        defaultHook: `${greeting} Impressed by your Google Maps presence! Noticed your profile links to a social page (${rawUrl}) rather than a dedicated business website, which limits your Google search ranking and mobile bookings. We build dedicated websites with 1-tap WhatsApp booking engines. If you'd like, I can share some of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
-      }
-    } else if (lead.site_state === 'broken') {
-      return {
-        situation: 'BROKEN OR UNREACHABLE WEBSITE',
-        angle: 'Urgent Brand Damage & Lost Ad/Search Spend',
-        badgeColor: 'bg-rose-100 dark:bg-rose-950/70 border-2 border-rose-300 dark:border-rose-600',
-        tagBg: 'bg-rose-500 text-white font-black shadow-xs',
-        textColor: 'text-rose-950 dark:text-rose-100',
-        whyPitch: `Their registered website link (${rawUrl}) is throwing errors or failing to load on mobile phones. Prospective customers clicking their Google Maps profile land on an error screen, instantly destroying credibility.`,
-        recommendedSolution: `Emergency Website Fix + Instant WhatsApp Booking integration. High urgency pitch because they are actively leaking paying clients right now.`,
-        defaultHook: `${greeting} Wanted to give you a quick heads up — noticed your website link on Google Maps (${rawUrl}) is currently not loading / showing an error page. Local clients clicking your profile are bouncing off. We help businesses fix, revamp, and integrate fast WhatsApp booking. If interested, I can share some of our work samples. Would you be open for a quick 5-minute call or Zoom meeting to discuss fixing this?`
-      }
-    } else {
-      return {
-        situation: 'ACTIVE WEBSITE — NO WHATSAPP FUNNEL',
-        angle: 'Mobile Traffic Drop-off & Slow Booking Friction',
-        badgeColor: 'bg-emerald-100 dark:bg-emerald-950/70 border-2 border-emerald-300 dark:border-emerald-600',
-        tagBg: 'bg-emerald-600 text-white font-black shadow-xs',
-        textColor: 'text-emerald-950 dark:text-emerald-100',
-        whyPitch: `They have an active website, but it lacks direct 1-tap WhatsApp chat/appointment integration. Over 70% of local smartphone visitors refuse to fill out slow static contact forms and bounce without converting.`,
-        recommendedSolution: `Add an automated 1-Click WhatsApp Booking Funnel & Speed optimization to double their enquiry conversion rate without increasing ad spend.`,
-        defaultHook: `${greeting} Impressed by your Google Maps presence! Checked out ${rawUrl} — looks great, but noticed it lacks a 1-tap WhatsApp booking flow for mobile visitors. Most smartphone clients bounce if they can't message instantly. We help businesses optimize mobile conversion and automate client enquiries. If you'd like, I can share some of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
-      }
-    }
-  }
-
-  const strategy = getStrategicWhyPitch()
-
-  // Sanitize stored database pitch if it contains 'null', claims pre-built site, or references non-existent site
+  // Sanitize stored database pitch if it contains 'null', claims pre-built site, or has generic '1-tap'
   const isStaleOrBuggyPitch = (text?: string | null) => {
     if (!text) return true
     const lower = text.toLowerCase()
     if (lower.includes('null')) return true
-    if (lower.includes('we built a website for you') || lower.includes('we built a 1-page') || lower.includes('we built an automated whatsapp booking engine for modern businesses that 2x')) return true
+    if (lower.includes('we built a website for you') || lower.includes('we built a 1-page') || lower.includes('1-tap booking')) return true
     if (!hasRealWebsite && (lower.includes('checked out') || lower.includes('your website link'))) return true
     return false
   }
@@ -195,7 +201,7 @@ export default function LeadDetailPanel({
   // AI Regenerate Pitch with Gemini
   const handleRegeneratePitch = async () => {
     setIsRegeneratingPitch(true)
-    setRegenStatus('AI is crafting a fresh pitch...')
+    setRegenStatus(`AI is crafting a personalized ${strategy.nicheLabel} pitch...`)
     try {
       const res = await fetch('/api/audit', {
         method: 'POST',
@@ -205,6 +211,7 @@ export default function LeadDetailPanel({
           websiteUrl: hasRealWebsite ? lead.website_url : null,
           businessName: lead.business_name,
           category: lead.campaigns?.niche,
+          senderName: effectiveSenderName,
           regeneratePitchOnly: true
         })
       })
@@ -231,15 +238,15 @@ export default function LeadDetailPanel({
                 }
           })
         }
-        setRegenStatus('✨ Fresh pitch ready!')
-        setTimeout(() => setRegenStatus(null), 2500)
+        setRegenStatus(`✨ Fresh personalized pitch generated for ${strategy.nicheLabel}!`)
+        setTimeout(() => setRegenStatus(null), 3000)
       } else {
-        setRegenStatus('Failed to generate. Try again.')
+        setRegenStatus(data.error || 'Using tailored niche hook.')
         setTimeout(() => setRegenStatus(null), 3000)
       }
     } catch (err) {
       console.error('Failed to regenerate pitch:', err)
-      setRegenStatus('Error regenerating pitch.')
+      setRegenStatus('Using tailored niche hook.')
       setTimeout(() => setRegenStatus(null), 3000)
     } finally {
       setIsRegeneratingPitch(false)
@@ -355,9 +362,23 @@ export default function LeadDetailPanel({
                 Score: {score}/100
               </span>
 
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono uppercase bg-slate-200 dark:bg-stone-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-stone-700 font-bold">
-                {lead.status}
-              </span>
+              <div className="relative inline-flex items-center">
+                <select
+                  value={normalizeLeadStatus(lead.status)}
+                  onChange={(e) => onUpdateStatus(lead.id, e.target.value as LeadStatus)}
+                  className={`text-[10px] font-black uppercase pl-2.5 pr-5 py-0.5 rounded-full border outline-none cursor-pointer appearance-none shadow-2xs transition-all ${getLeadStatusBadgeStyle(lead.status)}`}
+                  title="Click to change CRM stage"
+                >
+                  {CANONICAL_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value} className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[7px] opacity-60">
+                  ▼
+                </span>
+              </div>
 
               {lead.campaigns?.name && (
                 <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-800 font-bold truncate max-w-[180px]">
@@ -577,11 +598,89 @@ export default function LeadDetailPanel({
               {/* Recommended Solution Strategy Box */}
               <div className="p-6 rounded-3xl bg-slate-50 dark:bg-stone-900 border-2 border-slate-200 dark:border-stone-700 space-y-2">
                 <span className="text-xs font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400 block">
-                  Recommended Offer & Strategy
+                  Recommended Offer & Strategy ({strategy.nicheLabel})
                 </span>
                 <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 leading-relaxed">
                   {strategy.recommendedSolution}
                 </p>
+              </div>
+
+              {/* Personal Touch / Sender Persona Selector */}
+              <div className="p-4 rounded-3xl bg-white dark:bg-stone-900 border-2 border-indigo-100 dark:border-stone-800 space-y-3 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <UserCheck size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white block">
+                        Sender Personal Touch
+                      </span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                        Personalize who is reaching out (adds human touch, never looks like a bot)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Persona Options */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPersona('aryan')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                        senderPersona === 'aryan' && includeSenderName
+                          ? 'bg-indigo-600 text-white shadow-xs scale-102 ring-2 ring-indigo-400/30'
+                          : 'bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-stone-700 border border-slate-200 dark:border-stone-700'
+                      }`}
+                    >
+                      <span>👤 Aryan</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPersona('dewansh')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                        senderPersona === 'dewansh' && includeSenderName
+                          ? 'bg-indigo-600 text-white shadow-xs scale-102 ring-2 ring-indigo-400/30'
+                          : 'bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-stone-700 border border-slate-200 dark:border-stone-700'
+                      }`}
+                    >
+                      <span>👤 Dewansh</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPersona('custom')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                        senderPersona === 'custom' && includeSenderName
+                          ? 'bg-indigo-600 text-white shadow-xs scale-102 ring-2 ring-indigo-400/30'
+                          : 'bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-stone-700 border border-slate-200 dark:border-stone-700'
+                      }`}
+                    >
+                      <span>✏️ Custom</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPersona('none')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        !includeSenderName || senderPersona === 'none'
+                          ? 'bg-slate-800 dark:bg-stone-700 text-white shadow-xs'
+                          : 'bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-stone-700 border border-slate-200 dark:border-stone-700'
+                      }`}
+                    >
+                      <span>🚫 No Name</span>
+                    </button>
+                  </div>
+                </div>
+
+                {senderPersona === 'custom' && includeSenderName && (
+                  <div className="flex items-center gap-2 pt-1 animate-fade-in">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">Your Name:</span>
+                    <input
+                      type="text"
+                      placeholder="Type sender name (e.g. Rahul, Sneha)..."
+                      value={customSenderName}
+                      onChange={(e) => handleCustomNameChange(e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-stone-800 border border-slate-300 dark:border-stone-700 text-slate-900 dark:text-white outline-none font-bold focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Strategic WhatsApp Hook Box */}
@@ -592,6 +691,14 @@ export default function LeadDetailPanel({
                     <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider">
                       Ready-to-Send WhatsApp Outreach Message
                     </h3>
+                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-300/60">
+                      {strategy.nicheLabel}
+                    </span>
+                    {effectiveSenderName && (
+                      <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60">
+                        via {effectiveSenderName}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button

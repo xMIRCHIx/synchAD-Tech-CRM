@@ -11,6 +11,11 @@ import LeadsListModal from '@/components/LeadsListModal'
 import LeadDetailPanel from '@/components/LeadDetailPanel'
 import { useData } from '@/context/DataContext'
 import type { Lead } from '@/lib/types'
+import {
+  normalizeLeadStatus,
+  getLeadStatusLabel,
+  getLeadStatusBadgeStyle
+} from '@/lib/statusHelper'
 
 export default function DashboardOverview() {
   const { leads, stats, initialLoading, updateLeadStatus } = useData()
@@ -307,8 +312,8 @@ export default function DashboardOverview() {
                             </div>
                           </td>
                           <td>
-                            <span className="badge badge-primary uppercase text-[10px] font-extrabold">
-                              {lead.status}
+                            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg inline-block border ${getLeadStatusBadgeStyle(lead.status)}`}>
+                              {getLeadStatusLabel(lead.status)}
                             </span>
                           </td>
                           <td className="text-right" onClick={(e) => e.stopPropagation()}>

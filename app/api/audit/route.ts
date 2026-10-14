@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getStrategicWhyPitch } from '@/lib/nichePitch'
 
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 export async function POST(req: Request) {
   try {
-    const { leadId, websiteUrl, businessName, category, regeneratePitchOnly } = await req.json()
+    const { leadId, websiteUrl, businessName, category, regeneratePitchOnly, senderName } = await req.json()
 
     if (!leadId && !websiteUrl) {
       return NextResponse.json({ error: 'leadId or websiteUrl is required' }, { status: 400 })
@@ -109,31 +110,36 @@ export async function POST(req: Request) {
       httpStatus = 404
     }
 
-    // 2. High-Converting Pitch Defaults (aligned with user rules)
+    // 2. High-Converting Niche-Personalized Pitch Defaults
     const greeting = name ? `Hey ${name}!` : 'Hey there!'
-    let defaultAiPitch = ''
-    if (siteState === 'none') {
-      defaultAiPitch = `${greeting} Impressed by your Google Maps presence and reviews! Noticed you don't have an official website or booking page linked yet, so many local clients end up choosing competitors who have 1-tap booking. We build modern, high-converting websites with instant WhatsApp booking for businesses. If you'd like, I can share a few of our work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
-    } else if (siteState === 'broken') {
-      defaultAiPitch = `${greeting} Wanted to give you a quick heads up — noticed your website link on Google Maps (${targetUrl || 'listed on profile'}) is currently not loading / showing an error page. Local clients clicking your profile are bouncing off. We help businesses fix, revamp, and integrate fast WhatsApp booking. If interested, I can share some work samples. Would you be open for a quick 5-minute call or Zoom meeting to discuss fixing this?`
-    } else {
-      defaultAiPitch = `${greeting} Impressed by your Google Maps presence! Checked out ${targetUrl} — looks great, but noticed it lacks a 1-tap WhatsApp booking flow for mobile visitors. Most smartphone clients bounce if they can't message instantly. We help businesses optimize mobile conversion and automate enquiries. If you'd like, I can share some work samples. Would you be open for a quick 5-minute call or Zoom meeting this week?`
-    }
+    const strategy = getStrategicWhyPitch({
+      businessName: name,
+      ownerName: currentLead?.owner_name,
+      niche,
+      address: currentLead?.address,
+      websiteUrl: targetUrl,
+      siteState,
+      googleRating: currentLead?.google_rating,
+      senderName,
+      includeSenderName: Boolean(senderName)
+    })
+
+    const defaultAiPitch = strategy.defaultHook
 
     let auditData = {
       flaws: existingAudit?.findings?.flaws || [
         siteState === 'none'
-          ? 'Zero digital website portal for mobile Google Maps visitors'
-          : 'Lacks 1-click WhatsApp appointment booking button',
-        'Mobile visitors bounce to competitors with faster booking',
+          ? `No official digital platform for customers searching in ${strategy.nicheLabel}`
+          : 'Lacks direct WhatsApp inquiry and portfolio showcase for mobile visitors',
+        'Mobile visitors bounce to competitors with active digital portals',
         'Missing localized customer enquiry automation'
       ],
       strengths: existingAudit?.findings?.strengths || [
-        'High Google Maps search visibility',
-        'Positive local customer reputation'
+        'High Google Maps search visibility and reviews',
+        'Established local business reputation'
       ],
       score: targetUrl ? (siteState === 'broken' ? 88 : 78) : 85,
-      pitch_angle: siteState === 'none' ? 'No Website Customer Loss' : (siteState === 'broken' ? 'Broken Website Leak' : 'WhatsApp Booking Engine'),
+      pitch_angle: strategy.angle,
       ai_pitch: defaultAiPitch
     }
 
@@ -143,8 +149,10 @@ export async function POST(req: Request) {
         const prompt = `You are a world-class B2B Growth Auditor & High-Converting WhatsApp Outreach Copywriter for SynchAD Tech.
 Analyze this business:
 - Business Name: "${name || 'Local Business'}"
-- Industry / Niche: "${niche}"
+- Industry / Niche: "${niche}" (${strategy.nicheLabel})
+- Location: "${currentLead?.address || 'India'}"
 - Website URL: "${targetUrl || 'None'}"
+- Outreach Sender Persona: "${senderName || 'SynchAD Tech Specialist'}"
 - Scraped Website / Profile Info:
 """
 ${scrapedMarkdown}
@@ -152,20 +160,28 @@ ${scrapedMarkdown}
 
 Task:
 1. Detect Website Health: Is the URL healthy ("exists"), broken/404/dead/error page ("broken"), or missing ("none")?
-2. Identify 3 specific, actionable flaws or revenue leaks.
+2. Identify 3 specific, actionable flaws or revenue leaks tailored to their industry (${strategy.nicheLabel}).
 3. Identify 2 genuine strengths to compliment them on.
 4. Calculate an opportunity score (integer between 65 and 95).
-5. Define a clear pitch_angle (e.g. "No Website Customer Loss", "Broken Web Link Emergency", "Mobile WhatsApp Funnel").
-6. Write a personalized, high-converting WhatsApp outreach message under 60 words:
+5. Define a clear pitch_angle tailored to ${strategy.nicheLabel}.
+6. Write a personalized, high-converting WhatsApp outreach message under 65 words:
    STRICT RULES FOR THE MESSAGE:
-   - Greeting: Start with "${greeting}" (NEVER use "Direct Contact" or a phone number as their name).
-   - NEVER CLAIM THAT YOU HAVE ALREADY BUILT A WEBSITE OR SAMPLE FOR THEM (e.g. NEVER say "We built a website for you" or "We built a demo for your business").
+   - Greeting & Personal Touch: Start with "${greeting} ${senderName ? `${senderName} here from SynchAD Tech. ` : ''}" (NEVER use "Direct Contact" or a phone number as their name).
+   - NEVER CLAIM THAT YOU HAVE ALREADY BUILT A WEBSITE OR DEMO FOR THEM.
+   - ABSOLUTE BAN ON GENERIC ROBOTIC PHRASES LIKE "1-tap booking" OR "1-tap WhatsApp booking engine".
+   - INDUSTRY-SPECIFIC VALUE:
+     * If Real Estate: Focus on property buyers browsing online, verified property showcase, downloadable brochures, and direct WhatsApp buyer inquiries.
+     * If CA / Tax / Accounting: Focus on corporate trust, partner credibility, GST/tax advisory service portfolios, and client consultation booking.
+     * If Clinic / Doctor: Focus on patient trust, treatments offered, and online appointment booking.
+     * If Coaching / Education: Focus on student admissions, batch schedules, topper results, and free demo class bookings.
+     * If Restaurant / Cafe: Focus on digital menu with photos, ambiance, and direct table/takeaway orders without heavy Swiggy/Zomato commission loss.
+     * If Hotel / Resort: Focus on room photos, tariffs, and direct booking saving 15-20% OTA commissions on MakeMyTrip.
+     * If Gym / Fitness: Focus on equipment showcase, membership tiers, and 1-day free trial pass registrations.
+     * If Interior / Architecture: Focus on 3D renders, past project portfolio galleries, and design consultation booking.
+     * If Other / Local Business: Focus on their specific business strengths and direct mobile customer inquiry funnels.
    - Offer work samples on request: Say "If you'd like, I can share a few of our work samples / recent client case studies".
    - The Call-To-Action (CTA) MUST ask for a quick 5-minute call or Zoom meeting (e.g. "Would you be open for a quick 5-minute call or Zoom meeting this week?").
-   - Tone: Friendly, professional, zero hype, zero spammy language.
-   - If Website is None: Highlight strong Google Maps profile, but explain missing official site leads to lost enquiries to competitors.
-   - If Website is Broken: Politely alert them that their site link on Google Maps (${targetUrl}) is throwing an error and bouncing potential customers.
-   - If Website Exists: Compliment their site/presence, note mobile visitors bounce because there's no instant 1-tap WhatsApp booking flow.
+   - Tone: Friendly, professional, conversational, zero hype, zero spammy language.
 
 Respond ONLY with valid JSON in this exact structure:
 {

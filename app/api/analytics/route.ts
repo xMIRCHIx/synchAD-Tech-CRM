@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET() {
   try {
     const supabase = createAdminClient()
@@ -25,7 +28,9 @@ export async function GET() {
     const repliedLeads = leads?.filter(l => l.status === 'replied').length || 0
     const sentLeads = leads?.filter(l => l.status === 'sent' || l.status === 'delivered' || l.status === 'read').length || 0
     const queuedLeads = leads?.filter(l => l.status === 'queued').length || 0
-    const reviewLeads = leads?.filter(l => l.status === 'review' || l.status === 'new').length || 0
+    const reviewLeads = leads?.filter(l => l.status === 'review' || l.status === 'new' || l.status === 'enriched').length || 0
+    const notRespondedLeads = leads?.filter(l => l.status === 'not_responded' || l.status === 'skipped').length || 0
+    const rejectedLeads = leads?.filter(l => l.status === 'rejected' || l.status === 'lost').length || 0
 
     const conversionRate = totalLeads > 0 ? ((wonClients / totalLeads) * 100).toFixed(1) : '0'
 
@@ -37,7 +42,9 @@ export async function GET() {
       { name: 'Queued', count: queuedLeads, value: queuedLeads },
       { name: 'Sent', count: sentLeads, value: sentLeads },
       { name: 'Replied', count: repliedLeads, value: repliedLeads },
-      { name: 'Won', count: wonClients, value: wonClients }
+      { name: 'Won', count: wonClients, value: wonClients },
+      { name: 'Not Responded', count: notRespondedLeads, value: notRespondedLeads },
+      { name: 'Rejected', count: rejectedLeads, value: rejectedLeads }
     ]
 
     // Site state distribution

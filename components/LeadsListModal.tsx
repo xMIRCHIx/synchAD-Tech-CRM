@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import type { Lead, LeadStatus, SiteState } from '@/lib/types'
+import { normalizeLeadStatus } from '@/lib/statusHelper'
 import {
   X, Users, Search, MapPin, Phone, Globe, ShieldCheck,
   AlertTriangle, CheckCircle2, Sparkles, Send, ExternalLink, ArrowRight
@@ -57,8 +58,8 @@ export default function LeadsListModal({
 
       if (!matchesSearch) return false
 
-      if (activeTab === 'review') return l.status === 'review' || l.status === 'new'
-      if (activeTab === 'won') return l.status === 'won'
+      if (activeTab === 'review') return normalizeLeadStatus(l.status) === 'review'
+      if (activeTab === 'won') return normalizeLeadStatus(l.status) === 'won'
       if (activeTab === 'broken') return l.site_state === 'broken'
       if (activeTab === 'active') return l.site_state === 'exists'
       return true
@@ -130,8 +131,8 @@ export default function LeadsListModal({
           <div className="flex flex-wrap items-center gap-1.5">
             {[
               { key: 'all', label: `All (${leads.length})` },
-              { key: 'review', label: `Awaiting Pitch (${leads.filter(l => l.status === 'review' || l.status === 'new').length})` },
-              { key: 'won', label: `Won Clients (${leads.filter(l => l.status === 'won').length})` },
+              { key: 'review', label: `Awaiting Pitch (${leads.filter(l => normalizeLeadStatus(l.status) === 'review').length})` },
+              { key: 'won', label: `Won Clients (${leads.filter(l => normalizeLeadStatus(l.status) === 'won').length})` },
               { key: 'broken', label: `Broken Sites (${leads.filter(l => l.site_state === 'broken').length})` },
               { key: 'active', label: `Active Sites (${leads.filter(l => l.site_state === 'exists').length})` },
             ].map(tab => (

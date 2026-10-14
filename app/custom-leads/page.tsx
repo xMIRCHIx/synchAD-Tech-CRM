@@ -15,6 +15,13 @@ import {
   Send, Sparkles, Database, CheckCircle2, Check, ArrowUpDown, Filter,
   Eye, ArrowRight
 } from 'lucide-react'
+import {
+  normalizeLeadStatus,
+  getLeadStatusLabel,
+  getLeadStatusBadgeStyle,
+  matchesStatusFilter,
+  CANONICAL_STATUS_OPTIONS
+} from '@/lib/statusHelper'
 
 export default function CustomLeadsPage() {
   const {
@@ -76,7 +83,7 @@ export default function CustomLeadsPage() {
         l.phone.includes(q) ||
         (l.address && l.address.toLowerCase().includes(q))
 
-      const matchesStatus = statusFilter === 'all' || l.status === statusFilter
+      const matchesStatus = matchesStatusFilter(l.status, statusFilter)
       const matchesSite = siteFilter === 'all' || l.site_state === siteFilter
 
       return matchesSearch && matchesStatus && matchesSite
@@ -105,7 +112,7 @@ export default function CustomLeadsPage() {
   const stats = useMemo(() => {
     const withWeb = customLeads.filter((l) => l.site_state === 'exists' || l.website_url).length
     const brokenWeb = customLeads.filter((l) => l.site_state === 'broken').length
-    const won = customLeads.filter((l) => l.status === 'won').length
+    const won = customLeads.filter((l) => normalizeLeadStatus(l.status) === 'won').length
     return {
       total: customLeads.length,
       withWeb,
@@ -117,13 +124,14 @@ export default function CustomLeadsPage() {
   const handleUpdateStatus = async (id: string, newStatus: LeadStatus) => {
     const ok = await updateLeadStatus(id, newStatus)
     if (ok) {
+      const canonical = normalizeLeadStatus(newStatus)
       if (selectedLead?.id === id) {
-        setSelectedLead((prev) => (prev ? { ...prev, status: newStatus } : null))
+        setSelectedLead((prev) => (prev ? { ...prev, status: canonical } : null))
       }
       setToast({
         id: Date.now().toString(),
         title: 'Status Updated',
-        description: `Lead moved to ${newStatus.toUpperCase()}`,
+        description: `Lead moved to ${getLeadStatusLabel(canonical, false).toUpperCase()}`,
         type: 'success'
       })
     }
@@ -638,19 +646,26 @@ export default function CustomLeadsPage() {
 
                       {/* Stage Selector */}
                       <td onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={lead.status === 'skipped' ? 'not_responded' : lead.status === 'lost' ? 'rejected' : lead.status}
-                          onChange={(e) => handleUpdateStatus(lead.id, e.target.value as LeadStatus)}
-                          className="text-[11px] font-black uppercase px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-700 text-slate-900 dark:text-white outline-none cursor-pointer shadow-2xs"
-                        >
-                          <option value="review" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Review</option>
-                          <option value="queued" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Queued</option>
-                          <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sent</option>
-                          <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Replied</option>
-                          <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Won</option>
-                          <option value="not_responded" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Not Responded</option>
-                          <option value="rejected" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Rejected</option>
-                        </select>
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={normalizeLeadStatus(lead.status)}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleUpdateStatus(lead.id, e.target.value as LeadStatus)
+                            }}
+                            className={`text-[10px] font-black uppercase pl-2.5 pr-6 py-1 rounded-lg border outline-none cursor-pointer appearance-none shadow-2xs transition-all ${getLeadStatusBadgeStyle(lead.status)}`}
+                            title="Click to change lead status directly"
+                          >
+                            {CANONICAL_STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value} className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[8px] opacity-60">
+                            ▼
+                          </span>
+                        </div>
                       </td>
 
                       {/* Actions */}

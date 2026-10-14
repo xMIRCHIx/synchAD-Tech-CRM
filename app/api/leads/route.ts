@@ -24,6 +24,9 @@ function calculateLeadScore(lead: any, audit?: any): number {
   return Math.min(99, Math.max(25, score));
 }
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const supabase = createAdminClient();
@@ -37,19 +40,33 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Attach computed score if missing
+    // Attach computed score if missing, and normalize legacy status strings
     const enrichedLeads = (leads || []).map((lead) => {
       const audit = Array.isArray(lead.website_audits)
         ? lead.website_audits[0]
         : lead.website_audits;
+
+      let normalizedStatus = lead.status;
+      if (normalizedStatus === 'lost') normalizedStatus = 'rejected';
+      else if (normalizedStatus === 'skipped') normalizedStatus = 'not_responded';
+      else if (normalizedStatus === 'new' || normalizedStatus === 'enriched') normalizedStatus = 'review';
+
       return {
         ...lead,
+        status: normalizedStatus || 'review',
         website_audits: audit || null,
         score: lead.score ?? calculateLeadScore(lead, audit),
       };
     });
 
-    return NextResponse.json({ leads: enrichedLeads });
+    return NextResponse.json(
+      { leads: enrichedLeads },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -172,7 +189,24 @@ export async function PATCH(request: Request) {
 
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ lead: data });
+
+    let finalLead = data;
+    if (finalLead) {
+      let norm = finalLead.status;
+      if (norm === 'lost') norm = 'rejected';
+      else if (norm === 'skipped') norm = 'not_responded';
+      else if (norm === 'new' || norm === 'enriched') norm = 'review';
+      finalLead = { ...finalLead, status: norm };
+    }
+
+    return NextResponse.json(
+      { lead: finalLead },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

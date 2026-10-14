@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import type { Lead, Campaign, LeadStatus } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
+import { normalizeLeadStatus } from '@/lib/statusHelper'
 
 interface DataContextType {
   leads: Lead[]
@@ -40,7 +41,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json()
         if (data.leads && Array.isArray(data.leads)) {
-          setLeads(data.leads)
+          setLeads(data.leads.map((l: Lead) => ({ ...l, status: normalizeLeadStatus(l.status) })))
         }
       }
     } catch (err) {
@@ -150,21 +151,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Optimistic Status Update
   const updateLeadStatus = useCallback(async (id: string, newStatus: LeadStatus): Promise<boolean> => {
-    // 1. Optimistic UI update immediately
+    const canonicalStatus = normalizeLeadStatus(newStatus)
+    // 1. Optimistic UI update immediately with canonical status
     setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l))
+      prev.map((l) => (l.id === id ? { ...l, status: canonicalStatus } : l))
     )
 
     try {
       const res = await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: newStatus }),
+        body: JSON.stringify({ id, status: canonicalStatus }),
       })
       if (!res.ok) {
         // Revert on failure
         fetchLeads(true)
         return false
+      }
+      const data = await res.json()
+      if (data?.lead) {
+        setLeads((prev) =>
+          prev.map((l) => (l.id === id ? { ...l, ...data.lead, status: normalizeLeadStatus(data.lead.status) } : l))
+        )
       }
       // Refresh stats quietly
       fetchStats(true)

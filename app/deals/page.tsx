@@ -17,7 +17,7 @@ import AgreementModal from '@/components/AgreementModal'
 const PRESET_FEATURES = [
   '⚡ Next.js Ultra-Fast Architecture',
   '📱 100% Mobile Responsive Layout',
-  '💬 1-Tap WhatsApp Booking Engine',
+  '💬 WhatsApp Lead & Inquiry Integration',
   '📍 Google Maps & Local SEO Setup',
   '🔒 SSL Certificate & Domain Linking',
   '💳 UPI & Online Payment Gateway',
@@ -40,8 +40,8 @@ function DealsStudioContent() {
   const [advancePaid, setAdvancePaid] = useState<number>(17500)
   const [currency, setCurrency] = useState<'INR' | 'USD'>('INR')
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('upi')
-  const [serviceType, setServiceType] = useState('Custom Website + WhatsApp Booking Funnel')
-  const [projectScope, setProjectScope] = useState('High-performance Next.js web application with 1-tap WhatsApp lead generation and mobile optimization.')
+  const [serviceType, setServiceType] = useState('Custom Website + WhatsApp Lead Funnel')
+  const [projectScope, setProjectScope] = useState('High-performance Next.js web application with direct WhatsApp client lead generation and mobile optimization.')
   const [targetDeadline, setTargetDeadline] = useState('')
   const [stage, setStage] = useState<DealStage>('closing')
 
@@ -49,7 +49,7 @@ function DealsStudioContent() {
   const [features, setFeatures] = useState<string[]>([
     '⚡ Next.js Ultra-Fast Architecture',
     '📱 100% Mobile Responsive Layout',
-    '💬 1-Tap WhatsApp Booking Engine',
+    '💬 WhatsApp Lead & Inquiry Integration',
     '📍 Google Maps & Local SEO Setup'
   ])
   const [customFeatureInput, setCustomFeatureInput] = useState('')

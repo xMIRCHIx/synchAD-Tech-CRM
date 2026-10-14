@@ -10,6 +10,13 @@ import {
 } from 'lucide-react'
 import Toast, { ToastMessage } from '@/components/Toast'
 import type { Lead, LeadStatus, SiteState } from '@/lib/types'
+import { detectNicheType } from '@/lib/nichePitch'
+import {
+  normalizeLeadStatus,
+  getLeadStatusLabel,
+  getLeadStatusBadgeStyle,
+  CANONICAL_STATUS_OPTIONS
+} from '@/lib/statusHelper'
 
 interface ChatMessage {
   id: string
@@ -31,6 +38,46 @@ export default function InboxPage() {
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const [tokenStatus, setTokenStatus] = useState<'live' | 'expired' | 'blocked' | 'loading' | null>(null)
   const [tokenErrorMessage, setTokenErrorMessage] = useState<string>('')
+
+  // Personal Touch: Sender Persona State (Aryan / Dewansh / Custom / None)
+  const [senderPersona, setSenderPersona] = useState<'aryan' | 'dewansh' | 'custom' | 'none'>('aryan')
+  const [customSenderName, setCustomSenderName] = useState('')
+  const [includeSenderName, setIncludeSenderName] = useState(true)
+
+  useEffect(() => {
+    try {
+      const savedPersona = localStorage.getItem('synchad_sender_persona') as any
+      const savedName = localStorage.getItem('synchad_custom_sender_name')
+      const savedInclude = localStorage.getItem('synchad_include_sender_name')
+      if (savedPersona && ['aryan', 'dewansh', 'custom', 'none'].includes(savedPersona)) {
+        setSenderPersona(savedPersona)
+      }
+      if (savedName) setCustomSenderName(savedName)
+      if (savedInclude !== null) setIncludeSenderName(savedInclude === 'true')
+    } catch {}
+  }, [])
+
+  const effectiveSenderName = !includeSenderName || senderPersona === 'none'
+    ? null
+    : senderPersona === 'dewansh'
+    ? 'Dewansh'
+    : senderPersona === 'custom'
+    ? (customSenderName.trim() || 'Representative')
+    : 'Aryan'
+
+  const handleSelectPersona = (persona: 'aryan' | 'dewansh' | 'custom' | 'none') => {
+    setSenderPersona(persona)
+    try {
+      localStorage.setItem('synchad_sender_persona', persona)
+      if (persona === 'none') {
+        setIncludeSenderName(false)
+        localStorage.setItem('synchad_include_sender_name', 'false')
+      } else {
+        setIncludeSenderName(true)
+        localStorage.setItem('synchad_include_sender_name', 'true')
+      }
+    } catch {}
+  }
 
   // Direct chat modal state
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false)
@@ -170,10 +217,11 @@ export default function InboxPage() {
       return isDirect || Boolean(isCustomNote)
     }
 
-    if (filterTab === 'new') return l.status === 'new' || l.status === 'review' || l.status === 'queued'
-    if (filterTab === 'sent') return l.status === 'sent' || l.status === 'delivered' || l.status === 'read'
-    if (filterTab === 'replied') return l.status === 'replied'
-    if (filterTab === 'won') return l.status === 'won'
+    const norm = normalizeLeadStatus(l.status)
+    if (filterTab === 'new') return norm === 'review' || norm === 'queued'
+    if (filterTab === 'sent') return norm === 'sent'
+    if (filterTab === 'replied') return norm === 'replied'
+    if (filterTab === 'won') return norm === 'won'
     return true
   })
 
@@ -277,20 +325,21 @@ export default function InboxPage() {
   // Update lead status
   async function handleUpdateStatus(newStatus: LeadStatus) {
     if (!selectedLead) return
+    const canonical = normalizeLeadStatus(newStatus)
     try {
       const res = await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedLead.id, status: newStatus })
+        body: JSON.stringify({ id: selectedLead.id, status: canonical })
       })
       if (res.ok) {
         setLeads((prev) =>
-          prev.map((l) => (l.id === selectedLead.id ? { ...l, status: newStatus } : l))
+          prev.map((l) => (l.id === selectedLead.id ? { ...l, status: canonical } : l))
         )
         setToast({
           id: Date.now().toString(),
           title: 'Status Updated',
-          description: `Lead moved to "${newStatus.toUpperCase()}".`,
+          description: `Lead moved to "${getLeadStatusLabel(canonical, false).toUpperCase()}".`,
           type: 'success'
         })
       }
@@ -481,6 +530,7 @@ export default function InboxPage() {
   }
 
   // Official Meta WhatsApp Message Templates (All 4 Approved & Live)
+  // Official Meta WhatsApp Message Templates (Niche-Aware & Personalized)
   const META_TEMPLATES = [
     {
       id: 'no_website_pitch',
@@ -491,12 +541,35 @@ export default function InboxPage() {
       headline: '🌐 Official Website & Client Portal Audit',
       footer: 'SynchAD Tech Services • Business Growth Systems',
       buttons: ['View Work Samples', 'Connect on Call'],
-      getText: (lead: any) => {
+      getText: (lead: any, sender?: string | null) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
         const rating = lead?.google_rating || '5.0'
         const city = lead?.address ? lead.address.split(',')[0].trim() : 'your city'
-        return `Hi ${name}, I came across ${bName} on Google Maps today.\n\nHuge congratulations on your impressive ${rating}★ rating — your customer reviews in ${city} are genuinely top-tier!\n\nHowever, I noticed you don't have an official website or digital booking portal listed yet. A reputable business like yours easily loses direct client inquiries to competitors.\n\nAt SynchAD Tech, we build high-converting modern websites and custom business management software tailored for businesses like yours.\n\nWould you be open to checking out a few of our work samples, or connecting for a quick 5-minute call / Zoom chat?`
+        const intro = sender ? `${sender} here from SynchAD Tech. ` : ''
+        const { type } = detectNicheType(lead?.campaigns?.niche, lead?.business_name)
+
+        if (type === 'real_estate') {
+          return `Hi ${name}! ${intro}I came across ${bName} in ${city} today.\n\nHuge congratulations on your impressive ${rating}★ rating on Google Maps!\n\nI noticed you don't have an official property showcase website linked yet. Serious property buyers looking for plots/flats online often turn to competitors who showcase verified listings and project brochures.\n\nAt SynchAD Tech, we build high-converting real estate portals that generate direct buyer inquiries.\n\nWould you be open to checking out a few of our real estate samples on a quick 5-minute call or Zoom this week?`
+        }
+
+        if (type === 'ca_finance') {
+          return `Hi ${name}! ${intro}Great to see your established practice for ${bName} with a solid ${rating}★ rating in ${city}!\n\nI noticed your firm doesn't have an official corporate website linked yet. Business owners and startups seeking corporate tax, GST, and audit guidance always look for credibility and service portfolios online before consulting.\n\nWe build authoritative CA and corporate advisory websites that build instant trust.\n\nWould you be open for a quick 5-minute call to check out our finance website samples?`
+        }
+
+        if (type === 'clinic_doctor') {
+          return `Hi ${name}! ${intro}Noticed your excellent ${rating}★ patient reviews for ${bName} in ${city}!\n\nWhen families search on Google Maps, they look for treatment details, doctor timings, and easy online appointment booking. Without an official site, many patients move to other clinics.\n\nWe build clean, patient-friendly medical websites that automate patient consultations.\n\nWould you be open for a quick 5-minute call to see some healthcare samples?`
+        }
+
+        if (type === 'coaching_education') {
+          return `Hi ${name}! ${intro}Loved seeing the fantastic ${rating}★ student reputation for ${bName} in ${city}!\n\nWhen parents and students search online, they compare topper results, batch timings, and demo class options. Without an official institute portal, many students end up enrolling with competing institutes.\n\nWe build modern coaching websites that drive student admissions and demo inquiries directly to WhatsApp.\n\nOpen for a quick 5-minute chat or Zoom this week?`
+        }
+
+        if (type === 'restaurant_cafe') {
+          return `Hi ${name}! ${intro}Huge fan of ${bName} in ${city} — love your food photos and reviews!\n\nWhen local food lovers search on Google Maps, they want to browse a digital menu with photos and book tables directly. We build vibrant, mobile-first restaurant websites that attract diners and drive direct orders without paying heavy delivery platform commissions.\n\nOpen for a quick 5-minute call or Zoom to check out our food & beverage samples?`
+        }
+
+        return `Hi ${name}! ${intro}I came across ${bName} on Google Maps today.\n\nHuge congratulations on your impressive ${rating}★ rating — your customer reviews in ${city} are genuinely top-tier!\n\nHowever, I noticed you don't have an official website or digital client portal listed yet, so many local clients end up choosing competitors with an active web presence.\n\nAt SynchAD Tech, we build high-converting modern websites and custom business management software tailored for businesses like yours.\n\nWould you be open to checking out a few of our work samples, or connecting for a quick 5-minute call / Zoom chat?`
       },
     },
     {
@@ -508,12 +581,13 @@ export default function InboxPage() {
       headline: '⚠️ Urgent: Website Link Error Detected',
       footer: 'SynchAD Tech Services • Rapid Web Support',
       buttons: ['Fix Broken Website', 'Schedule 5-Min Zoom'],
-      getText: (lead: any) => {
+      getText: (lead: any, sender?: string | null) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
         const rating = lead?.google_rating || '5.0'
         const city = lead?.address ? lead.address.split(',')[0].trim() : 'your city'
-        return `Hi ${name}, I was checking out ${bName} on Google Maps today.\n\nYour ${rating}★ rating and customer reputation in ${city} are fantastic!\n\nThat's why I wanted to alert you urgently — your website link is currently broken and showing an error page. Anyone clicking your profile from Google right now is bouncing off without inquiring.\n\nAt SynchAD Tech, we build modern web systems and custom business management software, and we can quickly restore and upgrade this for you.\n\nWould it be okay if I share our work samples, or hop on a quick 5-minute call / Zoom to help you fix this?`
+        const intro = sender ? `${sender} here from SynchAD Tech. ` : ''
+        return `Hi ${name}! ${intro}I was checking out ${bName} on Google Maps today.\n\nYour ${rating}★ rating and customer reputation in ${city} are fantastic!\n\nThat's why I wanted to alert you urgently — your website link is currently broken and showing an error page. Anyone clicking your profile from Google right now is bouncing off without inquiring.\n\nAt SynchAD Tech, we build modern web systems and custom business management software, and we can quickly restore and upgrade this for you.\n\nWould it be okay if I share our work samples, or hop on a quick 5-minute call / Zoom to help you fix this?`
       },
     },
     {
@@ -525,12 +599,13 @@ export default function InboxPage() {
       headline: '🚀 Mobile Conversion & Funnel Audit',
       footer: 'SynchAD Tech Services • Business Systems & Portals',
       buttons: ['Review Audit Findings', 'Connect with Dev Team'],
-      getText: (lead: any) => {
+      getText: (lead: any, sender?: string | null) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
         const rating = lead?.google_rating || '5.0'
-        const flaw = lead?.website_audits?.findings?.flaws?.[0] || 'missing a quick 1-tap WhatsApp booking button'
-        return `Hi ${name}, huge fan of the work ${bName} is doing with a solid ${rating}★ rating on Google!\n\nWhile checking your digital presence, I noticed ${flaw} on your website that might be slowing down your mobile conversion rate.\n\nBeyond modern web platforms, at SynchAD Tech we also build custom business management software, CRM portals, and automated client booking systems.\n\nWould you be open to checking out our work samples, or having a quick 5-minute call / Zoom to discuss?`
+        const flaw = lead?.website_audits?.findings?.flaws?.[0] || 'lacks interactive mobile inquiries and digital catalogs'
+        const intro = sender ? `${sender} here from SynchAD Tech. ` : ''
+        return `Hi ${name}! ${intro}Huge fan of the work ${bName} is doing with a solid ${rating}★ rating on Google!\n\nWhile checking your digital presence, I noticed your site ${flaw} that might be slowing down your mobile conversion rate.\n\nBeyond modern web platforms, at SynchAD Tech we also build custom business management software, CRM portals, and automated client booking systems.\n\nWould you be open to checking out our work samples, or having a quick 5-minute call / Zoom to discuss?`
       },
     },
     {
@@ -542,12 +617,13 @@ export default function InboxPage() {
       headline: '📲 Social-to-Website Conversion Architecture',
       footer: 'SynchAD Tech Services • Automated Client Booking',
       buttons: ['See Web Samples', 'Request Demo Portal'],
-      getText: (lead: any) => {
+      getText: (lead: any, sender?: string | null) => {
         const name = lead?.owner_name || lead?.business_name || 'there'
         const bName = lead?.business_name || 'your business'
         const rating = lead?.google_rating || '5.0'
         const city = lead?.address ? lead.address.split(',')[0].trim() : 'your city'
-        return `Hi ${name}, loved seeing your strong ${rating}★ rating and social presence for ${bName}!\n\nI noticed you're currently using a social media link instead of a dedicated business website and client portal. For a trusted brand in ${city}, having an official platform with custom management software and automated booking would significantly increase client inquiries.\n\nAt SynchAD Tech, we build modern websites and workflow systems for businesses like yours.\n\nWould you be open to checking out our work samples, or connecting on a quick 5-minute call / Zoom chat?`
+        const intro = sender ? `${sender} here from SynchAD Tech. ` : ''
+        return `Hi ${name}! ${intro}Loved seeing your strong ${rating}★ rating and social presence for ${bName}!\n\nI noticed you're currently using a social media link instead of a dedicated business website and client portal. For a trusted brand in ${city}, having an official platform with custom management software would significantly increase client inquiries.\n\nAt SynchAD Tech, we build modern websites and workflow systems for businesses like yours.\n\nWould you be open to checking out our work samples, or connecting on a quick 5-minute call / Zoom chat?`
       },
     },
     {
@@ -566,7 +642,7 @@ export default function InboxPage() {
 
   const activeTemplate =
     META_TEMPLATES.find((t) => t.id === selectedTemplateId) || META_TEMPLATES[0]
-  const activePitchText = activeTemplate.getText(selectedLead)
+  const activePitchText = activeTemplate.getText(selectedLead, effectiveSenderName)
 
   const flaws = selectedLead?.website_audits?.findings?.flaws || []
   const score = selectedLead?.score ?? 78
@@ -934,17 +1010,23 @@ export default function InboxPage() {
                 {/* Right: Actions & Tools */}
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                   {/* Status Dropdown */}
-                  <select
-                    value={selectedLead.status}
-                    onChange={(e) => handleUpdateStatus(e.target.value as any)}
-                    className="text-[11px] font-black uppercase px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-[#111b21] border border-slate-200 dark:border-stone-700 text-slate-900 dark:text-white outline-none cursor-pointer shadow-2xs"
-                  >
-                    <option value="new">Review</option>
-                    <option value="queued">Queued</option>
-                    <option value="sent">Sent</option>
-                    <option value="replied">Replied</option>
-                    <option value="won">Won 🏆</option>
-                  </select>
+                  <div className="relative inline-flex items-center">
+                    <select
+                      value={normalizeLeadStatus(selectedLead.status)}
+                      onChange={(e) => handleUpdateStatus(e.target.value as any)}
+                      className={`text-[10px] font-black uppercase pl-2.5 pr-6 py-1 rounded-lg border outline-none cursor-pointer appearance-none shadow-2xs transition-all ${getLeadStatusBadgeStyle(selectedLead.status)}`}
+                      title="Change CRM Status"
+                    >
+                      {CANONICAL_STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value} className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[8px] opacity-60">
+                      ▼
+                    </span>
+                  </div>
 
                   {/* Mark as Won Button */}
                   {selectedLead.status !== 'won' && (
@@ -1196,28 +1278,102 @@ export default function InboxPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Meta Template Quick Toolbar */}
-              <div className="px-4 py-2 bg-white dark:bg-[#202c33] border-t border-slate-200 dark:border-stone-800 flex items-center gap-1.5 overflow-x-auto shrink-0">
-                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 mr-1 shrink-0">
-                  Meta Templates:
-                </span>
-                {META_TEMPLATES.map((tmpl) => (
+              {/* Meta Template Quick Toolbar & Sender Persona Controls */}
+              <div className="px-3.5 py-2 bg-slate-50 dark:bg-[#1f2c34] border-t border-slate-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
+                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 mr-1 shrink-0">
+                    Templates:
+                  </span>
+                  {META_TEMPLATES.map((tmpl) => (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplateId(tmpl.id)
+                        setInputText(tmpl.getText(selectedLead, effectiveSenderName))
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-colors cursor-pointer border ${
+                        selectedTemplateId === tmpl.id
+                          ? 'bg-[#00a884] text-white border-[#00a884] shadow-2xs'
+                          : 'bg-white dark:bg-[#111b21] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-stone-700/80'
+                      }`}
+                    >
+                      🟢 {tmpl.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Personal Touch Persona Selector */}
+                <div className="flex items-center gap-1 shrink-0 bg-white dark:bg-[#111b21] px-2 py-0.5 rounded-xl border border-slate-200 dark:border-stone-700">
+                  <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 mr-0.5">
+                    Sender:
+                  </span>
                   <button
-                    key={tmpl.id}
                     type="button"
                     onClick={() => {
-                      setSelectedTemplateId(tmpl.id)
-                      setInputText(tmpl.getText(selectedLead))
+                      handleSelectPersona('aryan')
+                      const tmpl = META_TEMPLATES.find((t) => t.id === selectedTemplateId) || META_TEMPLATES[0]
+                      setInputText(tmpl.getText(selectedLead, 'Aryan'))
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-colors cursor-pointer border ${
-                      selectedTemplateId === tmpl.id
-                        ? 'bg-[#00a884] text-white border-[#00a884] shadow-2xs'
-                        : 'bg-slate-100 dark:bg-[#111b21] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-stone-700/80'
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                      senderPersona === 'aryan' && includeSenderName
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-stone-800'
                     }`}
                   >
-                    🟢 {tmpl.name}
+                    👤 Aryan
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectPersona('dewansh')
+                      const tmpl = META_TEMPLATES.find((t) => t.id === selectedTemplateId) || META_TEMPLATES[0]
+                      setInputText(tmpl.getText(selectedLead, 'Dewansh'))
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                      senderPersona === 'dewansh' && includeSenderName
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-stone-800'
+                    }`}
+                  >
+                    👤 Dewansh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectPersona('custom')
+                      const customName = prompt('Enter custom sender name:', customSenderName || '')
+                      if (customName !== null) {
+                        setCustomSenderName(customName)
+                        try { localStorage.setItem('synchad_custom_sender_name', customName) } catch {}
+                        const tmpl = META_TEMPLATES.find((t) => t.id === selectedTemplateId) || META_TEMPLATES[0]
+                        setInputText(tmpl.getText(selectedLead, customName || null))
+                      }
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                      senderPersona === 'custom' && includeSenderName
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-stone-800'
+                    }`}
+                  >
+                    ✏️ {customSenderName ? customSenderName : 'Custom'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectPersona('none')
+                      const tmpl = META_TEMPLATES.find((t) => t.id === selectedTemplateId) || META_TEMPLATES[0]
+                      setInputText(tmpl.getText(selectedLead, null))
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                      !includeSenderName || senderPersona === 'none'
+                        ? 'bg-slate-800 text-white shadow-2xs'
+                        : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-stone-800'
+                    }`}
+                  >
+                    🚫 None
+                  </button>
+                </div>
               </div>
 
               {/* Message Composer Bar */}
@@ -1300,8 +1456,8 @@ export default function InboxPage() {
               </div>
               <div className="p-3 bg-slate-50 dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
                 <span className="text-[10px] font-black uppercase text-slate-500 block">CRM Stage</span>
-                <span className="text-xs font-black uppercase text-slate-900 dark:text-white mt-1 block">
-                  {selectedLead.status}
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 mt-1 rounded-md inline-block border ${getLeadStatusBadgeStyle(selectedLead.status)}`}>
+                  {getLeadStatusLabel(selectedLead.status)}
                 </span>
               </div>
             </div>
@@ -1343,8 +1499,8 @@ export default function InboxPage() {
               </span>
               <ul className="space-y-1.5">
                 {(flaws.length > 0 ? flaws : [
-                  'Lacks 1-tap WhatsApp booking button on mobile',
-                  'Booking requires filling lengthy form or calling',
+                  'Lacks interactive mobile inquiry & direct portfolio showcase',
+                  'Client inquiry requires lengthy forms or manual calls',
                   'Mobile website conversion funnel missing'
                 ]).map((flaw: string, idx: number) => (
                   <li key={idx} className="p-2.5 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-200 dark:border-rose-900/40 flex items-start gap-2">

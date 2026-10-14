@@ -24,6 +24,9 @@ function calculateLeadScore(lead: any, audit?: any): number {
   return Math.min(99, Math.max(25, score))
 }
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET() {
   try {
     const supabase = createAdminClient()
@@ -65,8 +68,15 @@ export async function GET() {
       const audit = Array.isArray(lead.website_audits)
         ? lead.website_audits[0]
         : lead.website_audits
+
+      let normalizedStatus = lead.status
+      if (normalizedStatus === 'lost') normalizedStatus = 'rejected'
+      else if (normalizedStatus === 'skipped') normalizedStatus = 'not_responded'
+      else if (normalizedStatus === 'new' || normalizedStatus === 'enriched') normalizedStatus = 'review'
+
       return {
         ...lead,
+        status: normalizedStatus || 'review',
         website_audits: audit || null,
         score: calculateLeadScore(lead, audit)
       }
@@ -90,10 +100,17 @@ export async function GET() {
       return timeB - timeA
     })
 
-    return NextResponse.json({
-      leads: sortedLeads,
-      conversations: convMap
-    })
+    return NextResponse.json(
+      {
+        leads: sortedLeads,
+        conversations: convMap
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+        }
+      }
+    )
   } catch (error: any) {
     console.error('[Inbox GET] Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

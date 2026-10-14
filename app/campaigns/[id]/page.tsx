@@ -13,6 +13,14 @@ import Toast, { ToastMessage } from '@/components/Toast'
 import LeadDetailPanel from '@/components/LeadDetailPanel'
 import LeadsListModal from '@/components/LeadsListModal'
 import type { Lead, LeadStatus, SiteState, Campaign } from '@/lib/types'
+import { useData } from '@/context/DataContext'
+import {
+  normalizeLeadStatus,
+  getLeadStatusLabel,
+  getLeadStatusBadgeStyle,
+  matchesStatusFilter,
+  CANONICAL_STATUS_OPTIONS
+} from '@/lib/statusHelper'
 
 function parseNiche(rawNiche?: string | null) {
   if (!rawNiche) return { cleanNiche: '', websiteTypes: ['none', 'broken'] }
@@ -23,32 +31,6 @@ function parseNiche(rawNiche?: string | null) {
   return { cleanNiche, websiteTypes: types }
 }
 
-function getStatusBadgeStyle(status: LeadStatus | string) {
-  switch (status) {
-    case 'won':
-      return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700'
-    case 'replied':
-      return 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-950/80 dark:text-cyan-300 dark:border-cyan-700'
-    case 'sent':
-    case 'delivered':
-      return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700'
-    case 'queued':
-      return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/80 dark:text-purple-300 dark:border-purple-700'
-    case 'review':
-    case 'new':
-      return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-700'
-    case 'not_responded':
-    case 'skipped':
-      return 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-950/80 dark:text-orange-300 dark:border-orange-700'
-    case 'rejected':
-    case 'lost':
-      return 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-700'
-    default:
-      return 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700'
-  }
-}
-
-
 function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const campaignId = resolvedParams.id
@@ -57,8 +39,20 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
   const shouldBgScrape = searchParams?.get('bgScrape') === 'true'
   const hasTriggeredBgScrape = React.useRef(false)
 
+  const {
+    leads: allLeads,
+    campaigns: allCampaigns,
+    updateLeadStatus,
+    updateLead,
+    deleteLead: ctxDeleteLead,
+    refreshAll,
+  } = useData()
+
   const [campaign, setCampaign] = useState<Campaign | null>(null)
-  const [leads, setLeads] = useState<Lead[]>([])
+  const leads = React.useMemo(() => {
+    return allLeads.filter((l: Lead) => l.campaign_id === campaignId)
+  }, [allLeads, campaignId])
+
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isListModalOpen, setIsListModalOpen] = useState(false)
@@ -90,6 +84,25 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
     setIsMounted(true)
   }, [])
 
+  // Sync campaign from allCampaigns
+  useEffect(() => {
+    const foundCampaign = allCampaigns.find((c: any) => c.id === campaignId)
+    if (foundCampaign) {
+      setCampaign(foundCampaign)
+      const { cleanNiche, websiteTypes } = parseNiche(foundCampaign.niche)
+      setEditForm((prev) => ({
+        ...prev,
+        name: foundCampaign.name,
+        search_query: foundCampaign.search_query,
+        location: foundCampaign.location,
+        niche: cleanNiche,
+        max_leads: foundCampaign.max_leads || 25,
+      }))
+      setEditWebsiteTypes(websiteTypes)
+      setLoading(false)
+    }
+  }, [allCampaigns, campaignId])
+
   useEffect(() => {
     fetchCampaignAndLeads()
   }, [campaignId])
@@ -117,10 +130,8 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
   async function fetchCampaignAndLeads(silent = false) {
     if (!silent) setLoading(true)
     try {
-      // 1. Fetch campaigns
-      const cRes = await fetch('/api/campaigns')
-      const cData = await cRes.json()
-      const foundCampaign = (cData.campaigns || []).find((c: any) => c.id === campaignId)
+      await refreshAll(silent)
+      const foundCampaign = allCampaigns.find((c: any) => c.id === campaignId)
       if (foundCampaign) {
         setCampaign(foundCampaign)
         const { cleanNiche, websiteTypes } = parseNiche(foundCampaign.niche)
@@ -133,14 +144,6 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
           republishAndScrape: false
         })
         setEditWebsiteTypes(websiteTypes)
-      }
-
-      // 2. Fetch leads for this campaign
-      const lRes = await fetch('/api/leads')
-      const lData = await lRes.json()
-      if (lData.leads) {
-        const campaignLeads = lData.leads.filter((l: Lead) => l.campaign_id === campaignId)
-        setLeads(campaignLeads)
       }
     } catch (err: any) {
       console.error(err)
@@ -316,33 +319,22 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
   }
 
   async function handleUpdateStatus(id: string, newStatus: LeadStatus) {
-    const previousLeads = leads
-    // Optimistic update
-    setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l))
-    )
-    if (selectedLead?.id === id) {
-      setSelectedLead((prev) => (prev ? { ...prev, status: newStatus } : null))
-    }
-
     try {
-      const res = await fetch('/api/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: newStatus }),
-      })
-      if (!res.ok) {
-        throw new Error('Failed to update lead status in database')
+      const ok = await updateLeadStatus(id, newStatus)
+      if (ok) {
+        const canonical = normalizeLeadStatus(newStatus)
+        if (selectedLead?.id === id) {
+          setSelectedLead((prev) => (prev ? { ...prev, status: canonical } : null))
+        }
+        setToast({
+          id: Date.now().toString(),
+          title: 'Status Updated',
+          description: `Lead status updated to ${getLeadStatusLabel(canonical, false).toUpperCase()}`,
+          type: 'success',
+        })
       }
-      setToast({
-        id: Date.now().toString(),
-        title: 'Status Updated',
-        description: `Lead status updated to ${newStatus.toUpperCase()}`,
-        type: 'success',
-      })
     } catch (err: any) {
       console.error(err)
-      setLeads(previousLeads)
       setToast({
         id: Date.now().toString(),
         title: 'Update Failed',
@@ -354,19 +346,17 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
 
   async function handleDeleteLead(id: string, name: string) {
     if (!confirm(`Are you sure you want to remove "${name}" from this campaign?`)) return
-    const prev = leads
-    setLeads((l) => l.filter((lead) => lead.id !== id))
     try {
-      const res = await fetch(`/api/leads?id=${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete lead')
-      setToast({
-        id: Date.now().toString(),
-        title: 'Lead Removed',
-        description: `Removed "${name}" from campaign leads.`,
-        type: 'success',
-      })
+      const ok = await ctxDeleteLead(id)
+      if (ok) {
+        setToast({
+          id: Date.now().toString(),
+          title: 'Lead Removed',
+          description: `Removed "${name}" from campaign leads.`,
+          type: 'success',
+        })
+      }
     } catch (err: any) {
-      setLeads(prev)
       setToast({
         id: Date.now().toString(),
         title: 'Delete Failed',
@@ -376,9 +366,9 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
     }
   }
 
-  const wonCount = leads.filter(l => l.status === 'won').length
+  const wonCount = leads.filter(l => normalizeLeadStatus(l.status) === 'won').length
   const enrichedCount = leads.filter(l => l.status === 'enriched' || l.website_audits).length
-  const sentCount = leads.filter(l => l.status === 'sent' || l.status === 'delivered' || l.status === 'replied').length
+  const sentCount = leads.filter(l => normalizeLeadStatus(l.status) === 'sent').length
 
   // Filtered & Sorted Leads
   const processedLeads = React.useMemo(() => {
@@ -390,17 +380,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
         l.phone?.toLowerCase().includes(q) ||
         l.address?.toLowerCase().includes(q)
 
-      const matchesStatus =
-        statusFilter === 'all'
-          ? true
-          : statusFilter === 'review'
-          ? l.status === 'review' || l.status === 'new'
-          : statusFilter === 'not_responded'
-          ? l.status === 'not_responded' || l.status === 'skipped'
-          : statusFilter === 'rejected'
-          ? l.status === 'rejected' || l.status === 'lost'
-          : l.status === statusFilter
-
+      const matchesStatus = matchesStatusFilter(l.status, statusFilter)
       const matchesSite =
         siteFilter === 'all'
           ? true
@@ -458,7 +438,7 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
         }}
         onUpdateStatus={handleUpdateStatus}
         onLeadEnriched={(enriched) => {
-          setLeads(prev => prev.map(l => (l.id === enriched.id ? enriched : l)))
+          updateLead(enriched.id, enriched)
           setSelectedLead(enriched)
         }}
       />
@@ -961,23 +941,19 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
                         <td onClick={(e) => e.stopPropagation()}>
                           <div className="relative inline-flex items-center">
                             <select
-                              value={lead.status === 'skipped' ? 'not_responded' : lead.status === 'lost' ? 'rejected' : lead.status}
+                              value={normalizeLeadStatus(lead.status)}
                               onChange={(e) => {
                                 e.stopPropagation()
                                 handleUpdateStatus(lead.id, e.target.value as LeadStatus)
                               }}
-                              className={`text-[10px] font-black uppercase pl-2.5 pr-6 py-1 rounded-lg border outline-none cursor-pointer appearance-none shadow-2xs transition-all ${getStatusBadgeStyle(lead.status)}`}
+                              className={`text-[10px] font-black uppercase pl-2.5 pr-6 py-1 rounded-lg border outline-none cursor-pointer appearance-none shadow-2xs transition-all ${getLeadStatusBadgeStyle(lead.status)}`}
                               title="Click to change lead status directly"
                             >
-                              <option value="review" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Review</option>
-                              <option value="new" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">New</option>
-                              <option value="queued" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Queued</option>
-                              <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Pitched / Sent</option>
-                              <option value="delivered" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Delivered</option>
-                              <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Replied</option>
-                              <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Won 🏆</option>
-                              <option value="not_responded" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Not Responded 📵</option>
-                              <option value="rejected" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">Rejected ❌</option>
+                              {CANONICAL_STATUS_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value} className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">
+                                  {opt.label}
+                                </option>
+                              ))}
                             </select>
                             <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[8px] opacity-60">
                               ▼
