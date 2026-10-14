@@ -20,7 +20,8 @@ import {
   getLeadStatusLabel,
   getLeadStatusBadgeStyle,
   matchesStatusFilter,
-  CANONICAL_STATUS_OPTIONS
+  CANONICAL_STATUS_OPTIONS,
+  STATUS_FILTER_OPTIONS
 } from '@/lib/statusHelper'
 
 export default function CustomLeadsPage() {
@@ -452,12 +453,11 @@ export default function CustomLeadsPage() {
               onChange={(e) => setStatusFilter(e.target.value as any)}
               className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
             >
-              <option value="all" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">All Stages</option>
-              <option value="review" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Review</option>
-              <option value="queued" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Queued</option>
-              <option value="sent" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Sent</option>
-              <option value="replied" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Replied</option>
-              <option value="won" className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100">Won</option>
+              {STATUS_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.key} value={opt.key} className="bg-white dark:bg-[#161B22] text-slate-900 dark:text-slate-100 font-bold">
+                  {opt.key === 'all' ? 'All Stages' : opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
