@@ -886,12 +886,18 @@ export default function InboxPage() {
                       </div>
                       <span
                         className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-white dark:ring-[#111b21] ${
-                          lead.status === 'won'
+                          normalizeLeadStatus(lead.status) === 'won'
                             ? 'bg-emerald-500'
-                            : lead.status === 'replied'
-                            ? 'bg-emerald-500 animate-pulse'
-                            : lead.status === 'sent'
-                            ? 'bg-indigo-500'
+                            : normalizeLeadStatus(lead.status) === 'replied'
+                            ? 'bg-cyan-500 animate-pulse'
+                            : normalizeLeadStatus(lead.status) === 'sent'
+                            ? 'bg-blue-500'
+                            : normalizeLeadStatus(lead.status) === 'queued'
+                            ? 'bg-purple-500'
+                            : normalizeLeadStatus(lead.status) === 'not_responded'
+                            ? 'bg-orange-500'
+                            : normalizeLeadStatus(lead.status) === 'rejected'
+                            ? 'bg-rose-500'
                             : 'bg-amber-400'
                         }`}
                       />
@@ -904,17 +910,13 @@ export default function InboxPage() {
                           {lead.business_name}
                         </h4>
                         <span className={`text-[10px] font-bold shrink-0 ml-1 ${
-                          lead.status === 'replied'
+                          normalizeLeadStatus(lead.status) === 'replied'
+                            ? 'text-cyan-600 dark:text-cyan-400 font-black'
+                            : normalizeLeadStatus(lead.status) === 'won'
                             ? 'text-emerald-600 dark:text-emerald-400 font-black'
                             : 'text-slate-500 dark:text-slate-400'
                         }`}>
-                          {lead.status === 'replied'
-                            ? '💬 Replied'
-                            : lead.status === 'won'
-                            ? 'Won 🏆'
-                            : lead.status === 'sent'
-                            ? 'Sent'
-                            : 'New'}
+                          {getLeadStatusLabel(lead.status)}
                         </span>
                       </div>
 
@@ -928,8 +930,8 @@ export default function InboxPage() {
                             Custom
                           </span>
                         )}
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase bg-slate-200 dark:bg-stone-800 text-slate-700 dark:text-slate-300">
-                          {lead.status}
+                        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase border ${getLeadStatusBadgeStyle(lead.status)}`}>
+                          {getLeadStatusLabel(lead.status, false)}
                         </span>
                         {lead.google_rating && (
                           <span className="text-[10px] text-amber-500 font-extrabold flex items-center gap-0.5">
@@ -1029,7 +1031,7 @@ export default function InboxPage() {
                   </div>
 
                   {/* Mark as Won Button */}
-                  {selectedLead.status !== 'won' && (
+                  {normalizeLeadStatus(selectedLead.status) !== 'won' && (
                     <button
                       onClick={() => handleUpdateStatus('won')}
                       className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs"

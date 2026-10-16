@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { detectNicheType } from '@/lib/nichePitch'
 
 export async function POST(req: Request) {
   try {
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
         const supabase = createAdminClient()
         const { data: lead } = await supabase
           .from('leads')
-          .select('*, website_audits(*)')
+          .select('*, website_audits(*), campaigns(*)')
           .eq('id', leadId)
           .single()
 
@@ -50,10 +51,25 @@ export async function POST(req: Request) {
           const bName = lead.business_name || 'your business'
           const rating = lead.google_rating ? String(lead.google_rating) : '5.0'
           const city = lead.address ? lead.address.split(',')[0].trim() : 'your city'
+          
+          const nicheInfo = detectNicheType(lead.campaigns?.niche, lead.business_name, lead.notes)
+          let defaultNicheFlaw = 'missing direct mobile lead conversion & inquiry funnel'
+          if (nicheInfo.type === 'real_estate') {
+            defaultNicheFlaw = 'missing interactive property showcase & direct buyer inquiries'
+          } else if (nicheInfo.type === 'ca_finance') {
+            defaultNicheFlaw = 'missing corporate advisory portfolio & direct consultation booking'
+          } else if (nicheInfo.type === 'clinic_doctor') {
+            defaultNicheFlaw = 'missing direct patient online appointment booking'
+          } else if (nicheInfo.type === 'restaurant_cafe') {
+            defaultNicheFlaw = 'missing visual digital menu & table reservation flow'
+          } else if (nicheInfo.type === 'coaching_education') {
+            defaultNicheFlaw = 'missing demo class registration & course curriculum showcase'
+          }
+
           const flaw =
             lead.website_audits?.[0]?.findings?.flaws?.[0] ||
             lead.website_audits?.findings?.flaws?.[0] ||
-            'missing a 1-tap WhatsApp booking portal'
+            defaultNicheFlaw
 
           if (effectiveTemplate === 'website_upgrade_pitch') {
             params = [name, bName, rating, flaw]
@@ -68,7 +84,7 @@ export async function POST(req: Request) {
 
     if (!params || params.length < 4) {
       if (effectiveTemplate === 'website_upgrade_pitch') {
-        params = ['there', 'your business', '5.0', 'missing mobile booking portal']
+        params = ['there', 'your business', '5.0', 'missing mobile buyer inquiry flow']
       } else if (effectiveTemplate === 'social_to_web_pitch') {
         params = ['there', '5.0', 'your business', 'your city']
       } else {

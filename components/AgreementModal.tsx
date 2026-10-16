@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { Lead, ClientAgreement, AgencyProfile } from '@/lib/types'
 import { useData } from '@/context/DataContext'
+import { normalizeLeadStatus } from '@/lib/statusHelper'
 import { numberToWordsINR } from '@/lib/numberToWords'
 import { generateAgreementHtml, executePrint } from '@/lib/printTemplates'
 import '@/app/invoice-templates.css'
@@ -731,7 +732,7 @@ Thank you for choosing ${agency.name}!`
                       onClick={() => setClientCategoryTab('won')}
                       className={`flex-1 py-0.5 rounded ${clientCategoryTab === 'won' ? 'bg-purple-600 text-white' : 'text-stone-400'}`}
                     >
-                      Won Clients ({leads.filter(l => l.status === 'won').length})
+                      Won Clients ({leads.filter(l => normalizeLeadStatus(l.status) === 'won').length})
                     </button>
                     <button
                       type="button"
@@ -748,9 +749,9 @@ Thank you for choosing ${agency.name}!`
                     className="w-full px-2.5 py-1.5 rounded-xl border border-stone-700 bg-stone-900 text-white text-xs font-bold"
                   >
                     <option value="">-- Select Client --</option>
-                    {(clientCategoryTab === 'won' ? leads.filter(l => l.status === 'won') : leads).map(l => (
+                    {(clientCategoryTab === 'won' ? leads.filter(l => normalizeLeadStatus(l.status) === 'won') : leads).map(l => (
                       <option key={l.id} value={l.id}>
-                        {l.business_name || l.owner_name} {l.status === 'won' ? '★ WON' : ''}
+                        {l.business_name || l.owner_name} {normalizeLeadStatus(l.status) === 'won' ? '★ WON' : ''}
                       </option>
                     ))}
                   </select>

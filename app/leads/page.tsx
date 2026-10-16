@@ -147,8 +147,6 @@ export default function LeadsDashboard() {
   // Filtered & Sorted Leads
   const processedLeads = useMemo(() => {
     let result = leads.filter((l) => {
-      if (normalizeLeadStatus(l.status) === 'won' && statusFilter !== 'won') return false
-
       const q = search.toLowerCase()
       const matchesSearch =
         l.business_name.toLowerCase().includes(q) ||

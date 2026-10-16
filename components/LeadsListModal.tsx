@@ -2,7 +2,11 @@
 
 import React, { useState, useMemo } from 'react'
 import type { Lead, LeadStatus, SiteState } from '@/lib/types'
-import { normalizeLeadStatus } from '@/lib/statusHelper'
+import {
+  normalizeLeadStatus,
+  getLeadStatusLabel,
+  getLeadStatusBadgeStyle
+} from '@/lib/statusHelper'
 import {
   X, Users, Search, MapPin, Phone, Globe, ShieldCheck,
   AlertTriangle, CheckCircle2, Sparkles, Send, ExternalLink, ArrowRight
@@ -193,6 +197,7 @@ export default function LeadsListModal({
                       <th className="py-3.5 px-4 w-[250px]">Full Location Address</th>
                       <th className="py-3.5 px-4 w-[125px]">Website Status</th>
                       <th className="py-3.5 px-4 w-[80px]">Score</th>
+                      <th className="py-3.5 px-4 w-[130px]">CRM Stage</th>
                       <th className="py-3.5 px-4 w-[140px] text-right">Inspect Detail</th>
                     </tr>
                   </thead>
@@ -288,6 +293,13 @@ export default function LeadsListModal({
                                 : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
                             }`}>
                               {score}/100
+                            </span>
+                          </td>
+
+                          {/* CRM Stage */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`inline-block text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${getLeadStatusBadgeStyle(lead.status)}`}>
+                              {getLeadStatusLabel(lead.status)}
                             </span>
                           </td>
 

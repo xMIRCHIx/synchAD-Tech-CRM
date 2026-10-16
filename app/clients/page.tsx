@@ -15,10 +15,11 @@ import AgreementModal from '@/components/AgreementModal'
 import InvoiceModal from '@/components/InvoiceModal'
 import Toast, { ToastMessage } from '@/components/Toast'
 import { useData } from '@/context/DataContext'
+import { normalizeLeadStatus } from '@/lib/statusHelper'
 
 export default function ClientsDashboard() {
   const { leads, initialLoading, isRefreshing, refreshAll, updateLeadStatus } = useData()
-  const clients = React.useMemo(() => leads.filter((l) => l.status === 'won'), [leads])
+  const clients = React.useMemo(() => leads.filter((l) => normalizeLeadStatus(l.status) === 'won'), [leads])
   const loading = initialLoading && leads.length === 0
 
   const [search, setSearch] = useState('')

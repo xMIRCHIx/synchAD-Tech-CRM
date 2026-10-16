@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { normalizeLeadStatus } from '@/lib/statusHelper'
 
 export async function GET() {
   try {
@@ -105,7 +106,7 @@ export async function GET() {
       siteStateData,
       campaignStats,
       timelineData,
-      leads: leads || []
+      leads: (leads || []).map((l: any) => ({ ...l, status: normalizeLeadStatus(l.status) }))
     })
 
   } catch (err: any) {

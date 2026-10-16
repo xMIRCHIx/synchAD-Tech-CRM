@@ -28,6 +28,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { useData } from '@/context/DataContext'
+import { normalizeLeadStatus } from '@/lib/statusHelper'
 import type { AgencyNote, Lead } from '@/lib/types'
 import Toast, { ToastMessage } from '@/components/Toast'
 
@@ -350,7 +351,7 @@ export default function NotepadPage() {
         map.set(name.toLowerCase(), {
           id: l.id,
           name,
-          isWon: l.status === 'won'
+          isWon: normalizeLeadStatus(l.status) === 'won'
         })
       }
     })

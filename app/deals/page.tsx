@@ -9,6 +9,7 @@ import {
   ExternalLink, UserCheck, Users, TrendingUp, AlertCircle
 } from 'lucide-react'
 import { useData } from '@/context/DataContext'
+import { normalizeLeadStatus } from '@/lib/statusHelper'
 import type { Lead, ClientDeal, DealStage, PaymentMode, DealInstallment } from '@/lib/types'
 import Toast, { ToastMessage } from '@/components/Toast'
 import InvoiceModal from '@/components/InvoiceModal'
@@ -71,7 +72,7 @@ function DealsStudioContent() {
   const [isAgreementOpen, setIsAgreementOpen] = useState(false)
 
   // Filter lists
-  const wonClients = useMemo(() => leads.filter(l => l.status === 'won'), [leads])
+  const wonClients = useMemo(() => leads.filter(l => normalizeLeadStatus(l.status) === 'won'), [leads])
   const eligibleClients = clientCategoryTab === 'won' ? wonClients : leads
 
   const filteredClients = useMemo(() => {

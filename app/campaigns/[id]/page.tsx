@@ -19,7 +19,8 @@ import {
   getLeadStatusLabel,
   getLeadStatusBadgeStyle,
   matchesStatusFilter,
-  CANONICAL_STATUS_OPTIONS
+  CANONICAL_STATUS_OPTIONS,
+  STATUS_FILTER_OPTIONS
 } from '@/lib/statusHelper'
 
 function parseNiche(rawNiche?: string | null) {
@@ -737,14 +738,11 @@ function CampaignDetailContent({ params }: { params: Promise<{ id: string }> }) 
                 onChange={(e) => setStatusFilter(e.target.value as LeadStatus | 'all')}
                 className="bg-transparent border-none outline-none text-slate-900 dark:text-white cursor-pointer font-bold text-xs"
               >
-                <option value="all">All Stages</option>
-                <option value="review">Stage: Review / New</option>
-                <option value="queued">Stage: Queued</option>
-                <option value="sent">Stage: Sent</option>
-                <option value="replied">Stage: Replied</option>
-                <option value="won">Stage: Won</option>
-                <option value="not_responded">Stage: Not Responded</option>
-                <option value="rejected">Stage: Rejected</option>
+                {STATUS_FILTER_OPTIONS.map((st) => (
+                  <option key={st.key} value={st.key}>
+                    Stage: {st.label}
+                  </option>
+                ))}
               </select>
             </div>
 
